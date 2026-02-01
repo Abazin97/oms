@@ -1,0 +1,5 @@
+# proto contracts
+/common/
+
+# env files
+**/.env

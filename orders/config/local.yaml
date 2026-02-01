@@ -1,0 +1,12 @@
+env: "local"
+storage_path: "./storage/sso.db"
+token_ttl: 15m
+
+grpc:
+  port: 50051
+  timeout: 1h
+
+app:
+  id: 1
+  name: "grpc-app"
+  secret: "${secret}"
