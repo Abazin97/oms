@@ -12,7 +12,7 @@ import (
 type Repository interface {
 	Create(ctx context.Context, o models.Order) (string, error)
 	Get(ctx context.Context, id string) (models.Order, error)
-	Update(ctx context.Context, order models.Order) error
+	Update(ctx context.Context, id string, order models.Order) error
 }
 
 type postgresRepository struct {
@@ -119,8 +119,16 @@ func (r *postgresRepository) Get(ctx context.Context, id string) (models.Order, 
 	return order, rows.Err()
 }
 
-func (r *postgresRepository) Update(ctx context.Context, order models.Order) error {
+func (r *postgresRepository) Update(ctx context.Context, id string, order models.Order) error {
 	const op = "orders.repository.Update"
+
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE orders.orders 
+				SET status = COALESCE(NULLIF($2, ''), status), payment_link = COALESCE(NULLIF($3, ''), payment_link)
+				WHERE id = $1`, id, order.Status, order.PaymentLink)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
 
 	return nil
 }

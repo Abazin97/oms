@@ -107,6 +107,6 @@ func (h *serverAPI) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.
 	}, nil
 }
 
-func (h *serverAPI) UpdateOrder(ctx context.Context, req *pb.Order) (*pb.Order, error) {
-	return h.service.UpdateOrder(ctx)
+func (h *serverAPI) UpdateOrder(ctx context.Context, o *pb.Order) (*pb.Order, error) {
+	return h.service.UpdateOrder(ctx, o.Id, o)
 }

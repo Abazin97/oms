@@ -11,7 +11,7 @@ import (
 type OrdersService interface {
 	CreateOrder(context.Context, string, []models.Item) (*models.Order, error)
 	GetOrder(context.Context, string) (models.Order, error)
-	UpdateOrder(context.Context) (*pb.Order, error)
+	UpdateOrder(context.Context, string, *pb.Order) (*pb.Order, error)
 }
 
 type ordersService struct {
@@ -53,11 +53,11 @@ func (s *ordersService) GetOrder(ctx context.Context, id string) (models.Order, 
 	return o, nil
 }
 
-func (s *ordersService) UpdateOrder(ctx context.Context) (*pb.Order, error) {
-	err := s.repo.Update(ctx, models.Order{})
+func (s *ordersService) UpdateOrder(ctx context.Context, id string, o *pb.Order) (*pb.Order, error) {
+	err := s.repo.Update(ctx, id, models.Order{})
 	if err != nil {
-		return &pb.Order{}, err
+		return nil, err
 	}
 
-	return &pb.Order{}, nil
+	return o, nil
 }
