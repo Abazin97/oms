@@ -11,7 +11,7 @@ import (
 
 type Repository interface {
 	Create(ctx context.Context, o models.Order) (string, error)
-	Get(ctx context.Context, id int32) (models.Order, error)
+	Get(ctx context.Context, id string) (models.Order, error)
 	Update(ctx context.Context, order models.Order) error
 }
 
@@ -42,7 +42,7 @@ func (r *postgresRepository) Ping() error {
 }
 
 func (r *postgresRepository) Create(ctx context.Context, o models.Order) (string, error) {
-	const op = "repository.Create"
+	const op = "orders.repository.Create"
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -52,8 +52,8 @@ func (r *postgresRepository) Create(ctx context.Context, o models.Order) (string
 
 	var id string
 
-	err = tx.QueryRowContext(ctx, `INSERT INTO orders.orders (status, payment_link) values ($1, $2) RETURNING id`,
-		o.Status, o.PaymentLink).Scan(&id)
+	err = tx.QueryRowContext(ctx, `INSERT INTO orders.orders (status, customer_id, payment_link) values ($1, $2, $3) RETURNING id`,
+		o.Status, o.CustomerId, o.PaymentLink).Scan(&id)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
@@ -76,37 +76,51 @@ func (r *postgresRepository) Create(ctx context.Context, o models.Order) (string
 	return id, nil
 }
 
-func (r *postgresRepository) Get(ctx context.Context, id int32) (models.Order, error) {
-	const op = "repository.Get"
+func (r *postgresRepository) Get(ctx context.Context, id string) (models.Order, error) {
+	const op = "orders.repository.Get"
+	//log.Info("Getting order with id %s", id)
 
-	var order models.Order
-
-	row := r.db.QueryRowContext(ctx, `SELECT id, status, payment_link FROM orders WHERE id = $1`, id)
-
-	err := row.Scan(&order.Id, &order.Status, &order.PaymentLink)
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT o.id, o.status, o.payment_link, o.customer_id, oi.product_id, oi.name, oi.quantity, oi.price
+				FROM orders.orders o 
+				JOIN orders.order_items oi ON (o.id = oi.order_id)
+				WHERE o.id = $1`, id,
+	)
 	if err != nil {
-		return order, fmt.Errorf("%s: %w", op, err)
-	}
-
-	rows, err := r.db.QueryContext(ctx, `SELECT id, name, quantity, price FROM order_items WHERE order_id = $1`, order.Id)
-	if err != nil {
-		return order, fmt.Errorf("%s: %w", op, err)
+		return models.Order{}, fmt.Errorf("%s: %w", op, err)
 	}
 	defer rows.Close()
 
-	for rows.Next() {
-		var item models.Item
-		if err := rows.Scan(&item.Id, &item.Name, &item.Quantity, &item.Price); err != nil {
-			return order, fmt.Errorf("%s: %w", op, err)
-		}
-		order.Items = append(order.Items, item)
+	order := models.Order{
+		Items: make([]models.Item, 0),
 	}
+	var items []models.Item
+	isFirstRow := true
 
-	return order, nil
+	for rows.Next() {
+		var orderedItem models.Item
+
+		if err := rows.Scan(&order.Id, &order.Status, &order.PaymentLink, &order.CustomerId, &orderedItem.Id, &orderedItem.Name, &orderedItem.Quantity, &orderedItem.Price); err != nil {
+			return models.Order{}, fmt.Errorf("%s: %w", op, err)
+		}
+
+		if isFirstRow {
+			order.Items = []models.Item{}
+			isFirstRow = false
+		}
+
+		items = append(items, orderedItem)
+	}
+	if err := rows.Err(); err != nil {
+		return models.Order{}, fmt.Errorf("%s: %w", op, err)
+	}
+	order.Items = items
+
+	return order, rows.Err()
 }
 
 func (r *postgresRepository) Update(ctx context.Context, order models.Order) error {
-	const op = "repository.Update"
+	const op = "orders.repository.Update"
 
 	return nil
 }

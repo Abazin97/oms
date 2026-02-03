@@ -10,7 +10,7 @@ import (
 
 type OrdersService interface {
 	CreateOrder(context.Context, string, []models.Item) (*models.Order, error)
-	GetOrder(context.Context, string) (*pb.Order, error)
+	GetOrder(context.Context, string) (models.Order, error)
 	UpdateOrder(context.Context) (*pb.Order, error)
 }
 
@@ -43,13 +43,14 @@ func (s *ordersService) CreateOrder(ctx context.Context, customerID string, prod
 	return o, nil
 }
 
-func (s *ordersService) GetOrder(ctx context.Context, id string) (*pb.Order, error) {
-	//o, err := s.repo.Get(ctx, id)
-	//if err != nil {
-	//	return nil, err
-	//}
+func (s *ordersService) GetOrder(ctx context.Context, id string) (models.Order, error) {
+	o, err := s.repo.Get(ctx, id)
 
-	return &pb.Order{}, nil
+	if err != nil {
+		return models.Order{}, err
+	}
+
+	return o, nil
 }
 
 func (s *ordersService) UpdateOrder(ctx context.Context) (*pb.Order, error) {

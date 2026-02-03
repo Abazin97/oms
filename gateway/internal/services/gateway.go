@@ -8,6 +8,6 @@ import (
 
 type Gateway interface {
 	CreateOrder(ctx context.Context, cr *pb.CreateOrderRequest) (*pb.Order, error)
-	GetOrder(ctx context.Context, orderID int32) (*pb.Order, error)
+	GetOrder(ctx context.Context, orderID string) (*pb.Order, error)
 	Close() error
 }

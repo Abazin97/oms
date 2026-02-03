@@ -1,16 +1,16 @@
 package models
 
 type Order struct {
-	Id          string
-	Status      string
-	CustomerId  string
-	Items       []Item
-	PaymentLink string
+	Id          string `json:"id"`
+	Status      string `json:"status"`
+	CustomerId  string `json:"customer_id"`
+	Items       []Item `json:"items"`
+	PaymentLink string `json:"payment_link"`
 }
 
 type Item struct {
-	Id       string
-	Name     string
-	Quantity int32
-	Price    string
+	Id       string `json:"id"`
+	Name     string `json:"name"`
+	Quantity int32  `json:"quantity"`
+	Price    string `json:"price"`
 }

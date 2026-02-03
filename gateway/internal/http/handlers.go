@@ -7,7 +7,6 @@ import (
 	"gateway/internal/services"
 	log "log/slog"
 	"net/http"
-	"strconv"
 
 	pb "github.com/Abazin97/common/gen/go/order"
 )
@@ -62,14 +61,9 @@ func (h *handler) createOrder(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) getOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	orderIdStr := r.PathValue("orderID")
+	id := r.PathValue("orderID")
 
-	orderID, err := strconv.ParseInt(orderIdStr, 10, 32)
-	if err != nil {
-		WriteError(w, http.StatusBadRequest, err.Error())
-	}
-
-	o, err := h.gateway.GetOrder(ctx, int32(orderID))
+	o, err := h.gateway.GetOrder(ctx, id)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, err.Error())
 		return

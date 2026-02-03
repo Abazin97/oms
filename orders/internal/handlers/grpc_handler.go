@@ -62,12 +62,49 @@ func (h *serverAPI) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest)
 }
 
 func (h *serverAPI) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.Order, error) {
-	o, err := h.service.GetOrder(ctx, req.Id)
+	order, err := h.service.GetOrder(ctx, req.Id)
+
 	if err != nil {
 		return nil, err
 	}
 
-	return o, nil
+	items := make([]*pb.Item, 0, len(order.Items))
+	for _, it := range order.Items {
+		items = append(items, &pb.Item{
+			Id:       it.Id,
+			Name:     it.Name,
+			Quantity: it.Quantity,
+			Price:    it.Price,
+		})
+	}
+	// for multiple orders per customer
+
+	//orders := make([]*pb.Order, 0, len(accountOrders))
+	//for _, o := range accountOrders {
+	//	items := make([]*pb.Item, 0, len(o.Items))
+	//	for _, it := range o.Items {
+	//		items = append(items, &pb.Item{
+	//			Id:       it.Id,
+	//			Quantity: it.Quantity,
+	//			Price:    it.Price,
+	//			Name:     it.Name,
+	//		})
+	//	}
+	//	orders = append(orders, &pb.Order{
+	//		Id:         o.Id,
+	//		CustomerId: o.CustomerId,
+	//		Status:     o.Status,
+	//		Items:      []*pb.Item{},
+	//	})
+	//}
+
+	return &pb.Order{
+		Id:          order.Id,
+		Status:      order.Status,
+		CustomerId:  order.CustomerId,
+		PaymentLink: order.PaymentLink,
+		Items:       items,
+	}, nil
 }
 
 func (h *serverAPI) UpdateOrder(ctx context.Context, req *pb.Order) (*pb.Order, error) {

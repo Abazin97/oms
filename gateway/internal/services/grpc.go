@@ -45,12 +45,12 @@ func (g *gateway) CreateOrder(ctx context.Context, cr *pb.CreateOrderRequest) (*
 	return resp, nil
 }
 
-func (g *gateway) GetOrder(ctx context.Context, orderID int32) (*pb.Order, error) {
+func (g *gateway) GetOrder(ctx context.Context, id string) (*pb.Order, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	resp, err := g.client.GetOrder(ctx, &pb.GetOrderRequest{
-		Id: string(orderID),
+		Id: id,
 	})
 	if err != nil {
 		return nil, err
