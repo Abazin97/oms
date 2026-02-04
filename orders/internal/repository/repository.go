@@ -10,9 +10,10 @@ import (
 )
 
 type Repository interface {
-	Create(ctx context.Context, o models.Order) (string, error)
-	Get(ctx context.Context, id string) (models.Order, error)
-	Update(ctx context.Context, id string, order models.Order) error
+	Create(context.Context, models.Order) (string, error)
+	Get(context.Context, string) (models.Order, error)
+	Update(context.Context, string, models.Order) error
+	Close() error
 }
 
 type postgresRepository struct {
@@ -33,8 +34,8 @@ func NewPostgresRepository(url string) (Repository, error) {
 	return &postgresRepository{db: db}, nil
 }
 
-func (r *postgresRepository) Close() {
-	r.db.Close()
+func (r *postgresRepository) Close() error {
+	return r.db.Close()
 }
 
 func (r *postgresRepository) Ping() error {
