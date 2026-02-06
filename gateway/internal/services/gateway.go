@@ -3,11 +3,17 @@ package services
 import (
 	"context"
 
-	pb "github.com/Abazin97/common/gen/go/order"
+	pbo "github.com/Abazin97/common/gen/go/order"
+	pbs "github.com/Abazin97/common/gen/go/stock"
 )
 
-type Gateway interface {
-	CreateOrder(ctx context.Context, cr *pb.CreateOrderRequest) (*pb.Order, error)
-	GetOrder(ctx context.Context, orderID string) (*pb.Order, error)
+type OrdersGateway interface {
+	CreateOrder(ctx context.Context, cr *pbo.CreateOrderRequest) (*pbo.Order, error)
+	GetOrder(ctx context.Context, orderID string) (*pbo.Order, error)
+	Close() error
+}
+
+type StockGateway interface {
+	GetStock(ctx context.Context, cr *pbs.GetAvailabilityRequest) (*pbs.GetAvailabilityResponse, error)
 	Close() error
 }

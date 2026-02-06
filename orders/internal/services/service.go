@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"orders/internal/domain/models"
 	"orders/internal/repository"
 
@@ -23,6 +24,8 @@ func NewOrdersService(repo repository.Repository) OrdersService {
 }
 
 func (s *ordersService) CreateOrder(ctx context.Context, customerID string, products []models.Item) (*models.Order, error) {
+	const op = "order.services.CreateOrder"
+
 	id, err := s.repo.Create(ctx, models.Order{
 		CustomerId:  customerID,
 		Items:       products,
@@ -30,7 +33,7 @@ func (s *ordersService) CreateOrder(ctx context.Context, customerID string, prod
 		PaymentLink: "",
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	o := &models.Order{
@@ -44,19 +47,23 @@ func (s *ordersService) CreateOrder(ctx context.Context, customerID string, prod
 }
 
 func (s *ordersService) GetOrder(ctx context.Context, id string) (models.Order, error) {
+	const op = "order.services.GetOrder"
+
 	o, err := s.repo.Get(ctx, id)
 
 	if err != nil {
-		return models.Order{}, err
+		return models.Order{}, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return o, nil
 }
 
 func (s *ordersService) UpdateOrder(ctx context.Context, id string, o *pb.Order) (*pb.Order, error) {
+	const op = "order.services.UpdateOrder"
+
 	err := s.repo.Update(ctx, id, models.Order{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return o, nil

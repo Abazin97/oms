@@ -8,6 +8,8 @@ import (
 
 	pb "github.com/Abazin97/common/gen/go/order"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type serverAPI struct {
@@ -34,7 +36,7 @@ func (h *serverAPI) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest)
 
 	createdOrder, err := h.service.CreateOrder(ctx, req.CustomerId, items)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, "Failed to create order")
 	}
 	log.Info("CreateOrder request",
 		"customerId", req.CustomerId,
@@ -65,7 +67,7 @@ func (h *serverAPI) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.
 	order, err := h.service.GetOrder(ctx, req.Id)
 
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.NotFound, "Order not found")
 	}
 
 	items := make([]*pb.Item, 0, len(order.Items))
@@ -108,5 +110,10 @@ func (h *serverAPI) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.
 }
 
 func (h *serverAPI) UpdateOrder(ctx context.Context, o *pb.Order) (*pb.Order, error) {
-	return h.service.UpdateOrder(ctx, o.Id, o)
+	o, err := h.service.UpdateOrder(ctx, o.Id, o)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "Failed to update, order not found")
+	}
+
+	return o, nil
 }

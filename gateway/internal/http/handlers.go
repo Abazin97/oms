@@ -7,8 +7,12 @@ import (
 	"gateway/internal/services"
 	log "log/slog"
 	"net/http"
+	"time"
 
-	pb "github.com/Abazin97/common/gen/go/order"
+	pbo "github.com/Abazin97/common/gen/go/order"
+	pbs "github.com/Abazin97/common/gen/go/stock"
+	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Handler interface {
@@ -16,11 +20,12 @@ type Handler interface {
 }
 
 type handler struct {
-	gateway services.Gateway
+	ordersGateway services.OrdersGateway
+	stockGateway  services.StockGateway
 }
 
-func NewHandler(gateway services.Gateway) Handler {
-	return &handler{gateway: gateway}
+func NewHandler(ordersGateway services.OrdersGateway, stockGateway services.StockGateway) Handler {
+	return &handler{ordersGateway: ordersGateway, stockGateway: stockGateway}
 }
 
 func (h *handler) RegisterRoutes(mux *http.ServeMux) {
@@ -30,19 +35,21 @@ func (h *handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/{customerID}/orders", h.createOrder)
 
 	mux.HandleFunc("GET /api/{customerID}/orders/{orderID}", h.getOrder)
+
+	mux.HandleFunc("GET /api/stock", h.getStock)
 }
 
 func (h *handler) createOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	customerID := r.PathValue("customerID")
 
-	var items []*pb.ItemsQuantity
+	var items []*pbo.ItemsQuantity
 	if err := ReadJSON(r, &items); err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	o, err := h.gateway.CreateOrder(ctx, &pb.CreateOrderRequest{
+	o, err := h.ordersGateway.CreateOrder(ctx, &pbo.CreateOrderRequest{
 		CustomerId: customerID,
 		Items:      items,
 	})
@@ -63,13 +70,53 @@ func (h *handler) getOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("orderID")
 
-	o, err := h.gateway.GetOrder(ctx, id)
+	o, err := h.ordersGateway.GetOrder(ctx, id)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	WriteJSON(w, http.StatusOK, o)
+}
+
+func (h *handler) getStock(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var req getStockRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	id := req.LotID
+	if _, err := uuid.Parse(id); err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid lotID")
+		return
+	}
+
+	fromTime, err := time.Parse(time.RFC3339, req.From)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
+	}
+
+	toTime, err := time.Parse(time.RFC3339, req.To)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, err.Error())
+	}
+
+	fromProto := timestamppb.New(fromTime)
+	toProto := timestamppb.New(toTime)
+	s, err := h.stockGateway.GetStock(ctx, &pbs.GetAvailabilityRequest{
+		LotId: id,
+		From:  fromProto,
+		To:    toProto,
+	})
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, s.Available)
 }
 
 func WriteJSON(w http.ResponseWriter, status int, data any) {
