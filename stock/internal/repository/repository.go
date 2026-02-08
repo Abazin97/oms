@@ -23,9 +23,9 @@ type ParkingSpot interface {
 
 type SpotReservation interface {
 	Create(ctx context.Context, tx tx.Tx, r *models.Reservation) error
-	Get(ctx context.Context, id uuid.UUID) (*models.Reservation, error)
-	Update(ctx context.Context, tx tx.Tx, id uuid.UUID, status string) error
-	DeleteExpired(ctx context.Context, tx tx.Tx, now time.Time) ([]models.Reservation, error)
+	//Get(ctx context.Context, id uuid.UUID) (*models.Reservation, error)
+	//Update(ctx context.Context, tx tx.Tx, id uuid.UUID, status string) error
+	//DeleteExpired(ctx context.Context, tx tx.Tx, now time.Time) ([]models.Reservation, error)
 }
 
 type ParkingSpotRepository struct {
@@ -83,6 +83,21 @@ func (r *ParkingSpotRepository) Get(ctx context.Context, id uuid.UUID, from time
 	}
 
 	return exists, nil
+}
+
+func (r *SpotReservationRepository) Create(ctx context.Context, tx tx.Tx, res *models.Reservation) error {
+	const op = "stock.repository.Create"
+
+	_, err := tx.ExecContext(ctx,
+		`INSERT INTO stock.spot_reservations (id, order_id, expires_at, created_at, parking_spot_id, starts_at, ends_at, status)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		res.ID, res.OrderID, res.ExpiresAt, res.CreatedAt, res.ParkingSpotID, res.StartsAt, res.EndsAt, res.Status)
+
+	if err != nil {
+		return fmt.Errorf("%s %w", op, err)
+	}
+
+	return nil
 }
 
 //func (r *ParkingPlacesRepository) Lock(ctx context.Context, tx services.Tx, id uuid.UUID) (*models.ParkingPlaces, error) {

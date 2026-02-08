@@ -34,7 +34,7 @@ func (h *serverAPI) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest)
 		}
 	}
 
-	createdOrder, err := h.service.CreateOrder(ctx, req.CustomerId, items)
+	createdOrder, err := h.service.CreateOrder(ctx, req.CustomerId, req.LotId, req.From.AsTime(), req.To.AsTime(), items)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "Failed to create order")
 	}

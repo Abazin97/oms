@@ -15,9 +15,9 @@ import (
 var ErrNotEnoughSpots = errors.New("not enough spots")
 
 type StockService interface {
-	Reserve(ctx context.Context, lotID uuid.UUID, orderID uuid.UUID, count int) (*models.Reservation, error)
-	Release(ctx context.Context, reservationID uuid.UUID) error
-	Confirm(ctx context.Context, reservationID uuid.UUID) error
+	Reserve(ctx context.Context, lotID string, orderID string, from time.Time, to time.Time) (*models.Reservation, error)
+	//Release(ctx context.Context, reservationID uuid.UUID) error
+	//Confirm(ctx context.Context, reservationID uuid.UUID) error
 	GetAvailability(ctx context.Context, lotID uuid.UUID, from time.Time, to time.Time) (bool, error)
 }
 
@@ -42,6 +42,49 @@ func (s *stockService) GetAvailability(ctx context.Context, lotID uuid.UUID, fro
 	return available, nil
 }
 
+func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string, from time.Time, to time.Time) (*models.Reservation, error) {
+	const op = "stock.services.Reserve"
+
+	lotUUID, err := uuid.Parse(lotID)
+	if err != nil {
+		return nil, fmt.Errorf("%s: invalid lotID: %w", op, err)
+	}
+
+	orderUUID, err := uuid.Parse(orderID)
+	if err != nil {
+		return nil, fmt.Errorf("%s: invalid orderID: %w", op, err)
+	}
+
+	var reservation *models.Reservation
+
+	err = s.tx.WithTx(ctx, func(tx tx.Tx) error {
+
+		reservation = &models.Reservation{
+			ID:            uuid.New(),
+			ParkingSpotID: lotUUID,
+			OrderID:       orderUUID,
+			CreatedAt:     time.Now(),
+			ExpiresAt:     time.Now().Add(15 * time.Minute),
+			StartsAt:      from,
+			EndsAt:        to,
+			Status:        "pending",
+		}
+
+		err := s.spotReservationRepo.Create(ctx, tx, reservation)
+		if err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return reservation, nil
+}
+
 //func (s *stockService) Confirm(ctx context.Context, reservationID uuid.UUID) error {
 //	const op = "stock.services.Confirm"
 //
@@ -50,50 +93,13 @@ func (s *stockService) GetAvailability(ctx context.Context, lotID uuid.UUID, fro
 //		if err != nil {
 //			return fmt.Errorf("%s: %w", op, err)
 //		}
+//		if err := s.spotReservationRepo.Update(ctx, tx, lot); err != nil {
+//			return fmt.Errorf("%s: %w", op, err)
+//		}
 //
 //		return nil
 //	})
 //}
-//
-//func (s *stockService) Reserve(ctx context.Context, lotID uuid.UUID, orderID uuid.UUID, count int) (*models.Reservation, error) {
-//	const op = "stock.services.Reserve"
-//
-//	var reservation *models.Reservation
-//
-//	err := s.tx.WithTx(ctx, func(tx Tx) error {
-//		lot, err := s.parkingPlacesRepo.Lock(ctx, tx, lotID)
-//		if err != nil {
-//			return fmt.Errorf("%s: %w", op, err)
-//		}
-//
-//		if lot.AvailableSpots < count {
-//			return ErrNotEnoughSpots
-//		}
-//
-//		lot.AvailableSpots -= count
-//
-//		if err := s.parkingPlacesRepo.Update(ctx, tx, lot); err != nil {
-//			return fmt.Errorf("%s: %w", op, err)
-//		}
-//
-//		reservation = &models.Reservation{
-//			ID:           uuid.New(),
-//			ParkingLotID: lotID,
-//			OrderID:      orderID,
-//			SpotsCount:   count,
-//			ExpiresAt:    time.Now().Add(15 * time.Minute),
-//		}
-//
-//		return nil
-//	})
-//
-//	if err != nil {
-//		return nil, fmt.Errorf("%s: %w", op, err)
-//	}
-//
-//	return reservation, nil
-//}
-//
 //func (s *stockService) Release(ctx context.Context, reservationID uuid.UUID) error {
 //	const op = "stock.services.Release"
 //

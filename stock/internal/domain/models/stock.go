@@ -22,10 +22,12 @@ type ParkingSpot struct {
 }
 
 type Reservation struct {
-	ID           uuid.UUID
-	ParkingLotID uuid.UUID
-	OrderID      uuid.UUID
-	SpotsCount   int
-	ExpiresAt    time.Time
-	Status       string
+	ID            uuid.UUID
+	OrderID       uuid.UUID
+	ExpiresAt     time.Time
+	CreatedAt     time.Time
+	ParkingSpotID uuid.UUID
+	StartsAt      time.Time
+	EndsAt        time.Time
+	Status        string
 }

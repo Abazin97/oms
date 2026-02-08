@@ -43,22 +43,25 @@ func (h *handler) createOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	customerID := r.PathValue("customerID")
 
-	var items []*pbo.ItemsQuantity
-	if err := ReadJSON(r, &items); err != nil {
+	var req internal.CreateOrderHTTPRequest
+	if err := ReadJSON(r, &req); err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	o, err := h.ordersGateway.CreateOrder(ctx, &pbo.CreateOrderRequest{
 		CustomerId: customerID,
-		Items:      items,
+		Items:      req.Items,
+		LotId:      req.LotID,
+		From:       timestamppb.New(req.From),
+		To:         timestamppb.New(req.To),
 	})
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	res := internal.CreateOrderRequest{
+	res := internal.CreateOrderResponse{
 		Order:         o,
 		RedirectToURL: fmt.Sprintf("http://localhost:50051/%s/orders/", o.Id),
 	}

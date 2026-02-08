@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"orders/internal/gateway"
 	"orders/internal/handlers"
 	"orders/internal/repository"
 	"orders/internal/services"
@@ -45,7 +46,14 @@ func main() {
 	}
 	defer repo.Close()
 
-	ordersService := services.NewOrdersService(repo)
+	stockGateway, err := gateway.NewStockGateway("localhost:50052")
+	if err != nil {
+		log.Error("failed to connect grpc stock service", err)
+		return
+	}
+	defer stockGateway.Close()
+
+	ordersService := services.NewOrdersService(repo, stockGateway)
 	handlers.NewGRPCHandler(grpcSrv, ordersService)
 
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", 50051))

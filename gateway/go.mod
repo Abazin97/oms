@@ -3,7 +3,7 @@ module gateway
 go 1.24.9
 
 require (
-	github.com/Abazin97/common v0.2.97
+	github.com/Abazin97/common v0.2.991
 	google.golang.org/grpc v1.78.0
 )
 

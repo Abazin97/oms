@@ -4,29 +4,32 @@ import (
 	"context"
 	"fmt"
 	"orders/internal/domain/models"
+	"orders/internal/gateway"
 	"orders/internal/repository"
+	"time"
 
 	pb "github.com/Abazin97/common/gen/go/order"
 )
 
 type OrdersService interface {
-	CreateOrder(context.Context, string, []models.Item) (*models.Order, error)
+	CreateOrder(context.Context, string, string, time.Time, time.Time, []models.Item) (*models.Order, error)
 	GetOrder(context.Context, string) (models.Order, error)
 	UpdateOrder(context.Context, string, *pb.Order) (*pb.Order, error)
 }
 
 type ordersService struct {
-	repo repository.Repository
+	repo    repository.Repository
+	gateway gateway.StockGateway
 }
 
-func NewOrdersService(repo repository.Repository) OrdersService {
-	return &ordersService{repo: repo}
+func NewOrdersService(repo repository.Repository, service gateway.StockGateway) OrdersService {
+	return &ordersService{repo: repo, gateway: service}
 }
 
-func (s *ordersService) CreateOrder(ctx context.Context, customerID string, products []models.Item) (*models.Order, error) {
+func (s *ordersService) CreateOrder(ctx context.Context, customerID string, lotID string, from time.Time, to time.Time, products []models.Item) (*models.Order, error) {
 	const op = "order.services.CreateOrder"
 
-	id, err := s.repo.Create(ctx, models.Order{
+	orderID, err := s.repo.Create(ctx, models.Order{
 		CustomerId:  customerID,
 		Items:       products,
 		Status:      "pending",
@@ -36,11 +39,12 @@ func (s *ordersService) CreateOrder(ctx context.Context, customerID string, prod
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
+	_, err = s.gateway.Reserve(ctx, lotID, orderID, from, to)
 	o := &models.Order{
 		CustomerId: customerID,
 		Items:      products,
 		Status:     "pending",
-		Id:         id,
+		Id:         orderID,
 	}
 
 	return o, nil
