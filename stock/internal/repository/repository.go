@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	ErrNoAvailableSpots = errors.New("no available spots")
+	ErrReservationNotFound = errors.New("reservation not found")
 )
 
 type ParkingSpot interface {
@@ -24,8 +24,8 @@ type ParkingSpot interface {
 type SpotReservation interface {
 	Create(ctx context.Context, tx tx.Tx, r *models.Reservation) error
 	Get(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (string, error)
-	//Update(ctx context.Context, tx tx.Tx, id uuid.UUID, status string) error
-	//DeleteExpired(ctx context.Context, tx tx.Tx, now time.Time) ([]models.Reservation, error)
+	Update(ctx context.Context, tx tx.Tx, reservationID uuid.UUID, status string) error
+	DeleteExpired(ctx context.Context, tx tx.Tx, now time.Time) ([]models.Reservation, error)
 }
 
 type ParkingSpotRepository struct {
@@ -97,7 +97,7 @@ func (r *SpotReservationRepository) Get(ctx context.Context, lotID uuid.UUID, fr
 		FROM stock.spot_reservations sr
 		WHERE sr.parking_spot_id = ps.id
 		AND sr.status IN ('pending', 'confirmed')
-		AND NOT (sr.ends_at <= $2 OR sr.starts_at >= $3)
+		AND (sr.ends_at <= $2 OR sr.starts_at >= $3)
 	)
 	LIMIT 1;`
 
@@ -128,6 +128,30 @@ func (r *SpotReservationRepository) Create(ctx context.Context, tx tx.Tx, res *m
 	return nil
 }
 
+func (r *SpotReservationRepository) Update(ctx context.Context, tx tx.Tx, reservationID uuid.UUID, status string) error {
+	const op = "stock.repository.Update"
+
+	res, err := tx.ExecContext(ctx,
+		`UPDATE stock.spot_reservations
+				SET status = $2
+				WHERE id = $1`, reservationID, status)
+
+	if err != nil {
+		return fmt.Errorf("%s %w", op, err)
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("%s %w", op, err)
+	}
+
+	if rows == 0 {
+		return fmt.Errorf("%s %w", op, err)
+	}
+
+	return nil
+}
+
 //func (r *ParkingPlacesRepository) Lock(ctx context.Context, tx services.Tx, id uuid.UUID) (*models.ParkingPlaces, error) {
 //	const op = "stock.repository.Lock"
 //
@@ -147,26 +171,3 @@ func (r *SpotReservationRepository) Create(ctx context.Context, tx tx.Tx, res *m
 //	return &lot, nil
 //}
 //
-//func (r *ParkingPlacesRepository) Update(ctx context.Context, tx services.Tx, lot *models.ParkingPlaces) error {
-//	const op = "stock.repository.Update"
-//
-//	res, err := tx.ExecContext(ctx,
-//		`UPDATE stock.parking_lots
-//				SET name = $2, total_spots = $3, available_spots = $4
-//				WHERE id = $1`, lot.ID, lot.TotalSpots, lot.AvailableSpots, lot.ID)
-//
-//	if err != nil {
-//		return fmt.Errorf("%s %w", op, err)
-//	}
-//
-//	rows, err := res.RowsAffected()
-//	if err != nil {
-//		return fmt.Errorf("%s %w", op, err)
-//	}
-//
-//	if rows == 0 {
-//		return fmt.Errorf("%s %w", op, ErrParkingNotFound)
-//	}
-//
-//	return nil
-//}

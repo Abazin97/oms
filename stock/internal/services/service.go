@@ -17,8 +17,8 @@ var ErrNotEnoughSpots = errors.New("not enough spots")
 
 type StockService interface {
 	Reserve(ctx context.Context, lotID string, orderID string, from time.Time, to time.Time) (*models.Reservation, error)
-	//Release(ctx context.Context, reservationID uuid.UUID) error
-	//Confirm(ctx context.Context, reservationID uuid.UUID) error
+	Release(ctx context.Context, reservationID uuid.UUID) error
+	Confirm(ctx context.Context, reservationID uuid.UUID) error
 	GetAvailability(ctx context.Context, lotID uuid.UUID, from time.Time, to time.Time) (bool, error)
 }
 
@@ -99,25 +99,26 @@ func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string
 	return reservation, nil
 }
 
-//func (s *stockService) Confirm(ctx context.Context, reservationID uuid.UUID) error {
-//	const op = "stock.services.Confirm"
-//
-//	return s.tx.WithTx(ctx, func(tx Tx) error {
-//		_, err := s.parkingPlacesRepo.Get(ctx, reservationID)
-//		if err != nil {
-//			return fmt.Errorf("%s: %w", op, err)
-//		}
-//		if err := s.spotReservationRepo.Update(ctx, tx, lot); err != nil {
-//			return fmt.Errorf("%s: %w", op, err)
-//		}
-//
-//		return nil
-//	})
-//}
-//func (s *stockService) Release(ctx context.Context, reservationID uuid.UUID) error {
-//	const op = "stock.services.Release"
-//
-//	return s.tx.WithTx(ctx, func(tx Tx) error {
-//		return nil
-//	})
-//}
+func (s *stockService) Confirm(ctx context.Context, reservationID uuid.UUID) error {
+	const op = "stock.services.Confirm"
+
+	return s.tx.WithTx(ctx, func(tx tx.Tx) error {
+		if err := s.spotReservationRepo.Update(ctx, tx, reservationID, "confirmed"); err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
+		return nil
+	})
+}
+
+func (s *stockService) Release(ctx context.Context, reservationID uuid.UUID) error {
+	const op = "stock.services.Release"
+
+	return s.tx.WithTx(ctx, func(tx tx.Tx) error {
+		if err := s.spotReservationRepo.Update(ctx, tx, reservationID, "cancelled"); err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
+		return nil
+	})
+}
