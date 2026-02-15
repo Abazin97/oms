@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	log "log/slog"
 	"orders/internal/domain/models"
 	"orders/internal/gateway"
 	"orders/internal/repository"
@@ -26,7 +27,7 @@ func NewOrdersService(repo repository.Repository, service gateway.StockGateway) 
 	return &ordersService{repo: repo, gateway: service}
 }
 
-func (s *ordersService) CreateOrder(ctx context.Context, customerID string, lotID string, from time.Time, to time.Time, products []models.Item) (*models.Order, error) {
+func (s *ordersService) CreateOrder(ctx context.Context, lotID string, customerID string, from time.Time, to time.Time, products []models.Item) (*models.Order, error) {
 	const op = "order.services.CreateOrder"
 
 	orderID, err := s.repo.Create(ctx, models.Order{
@@ -38,6 +39,12 @@ func (s *ordersService) CreateOrder(ctx context.Context, customerID string, lotI
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
+
+	log.Info("orderID: ", orderID,
+		"customerID: ", customerID,
+		"products: ", products,
+		"fromTime: ", from,
+		"toTime: ", to)
 
 	_, err = s.gateway.Reserve(ctx, lotID, orderID, from, to)
 	o := &models.Order{

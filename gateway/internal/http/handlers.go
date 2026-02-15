@@ -52,7 +52,7 @@ func (h *handler) createOrder(w http.ResponseWriter, r *http.Request) {
 	o, err := h.ordersGateway.CreateOrder(ctx, &pbo.CreateOrderRequest{
 		CustomerId: customerID,
 		Items:      req.Items,
-		LotId:      req.LotID,
+		Id:         req.LotID,
 		From:       timestamppb.New(req.From),
 		To:         timestamppb.New(req.To),
 	})

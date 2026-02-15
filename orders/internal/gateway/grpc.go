@@ -28,12 +28,13 @@ func NewStockGateway(grpcAddr string) (*Gateway, error) {
 
 	return &Gateway{
 		clientStock: stockClient,
+		conn:        client,
 	}, nil
 }
 
-func (g *Gateway) Reserve(ctx context.Context, id string, orderID string, from time.Time, to time.Time) (*pbs.ReserveResponse, error) {
+func (g *Gateway) Reserve(ctx context.Context, lotID string, orderID string, from time.Time, to time.Time) (*pbs.ReserveResponse, error) {
 	return g.clientStock.Reserve(ctx, &pbs.ReserveRequest{
-		LotId:   id,
+		Id:      lotID,
 		OrderId: orderID,
 		To:      timestamppb.New(to),
 		From:    timestamppb.New(from),

@@ -51,7 +51,7 @@ func main() {
 		log.Error("failed to connect grpc stock service", err)
 		return
 	}
-	defer stockGateway.Close()
+	//defer stockGateway.Close()
 
 	ordersService := services.NewOrdersService(repo, stockGateway)
 	handlers.NewGRPCHandler(grpcSrv, ordersService)
@@ -73,12 +73,13 @@ func main() {
 	}()
 
 	<-ctx.Done()
+	stockGateway.Close()
 	grpcSrv.GracefulStop()
 	log.Info("gRPC server stopped", slog.String("addr", l.Addr().String()))
 
-	if err := repo.Close(); err != nil {
-		log.Error("failed to close repository: ", err)
-	}
+	//if err := repo.Close(); err != nil {
+	//	log.Error("failed to close repository: ", err)
+	//}
 }
 
 func setupLogger(env string) *slog.Logger {

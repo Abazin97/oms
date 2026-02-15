@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	log "log/slog"
 	"stock/internal/services"
 
 	pb "github.com/Abazin97/common/gen/go/stock"
@@ -9,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type serverAPI struct {
@@ -17,6 +19,9 @@ type serverAPI struct {
 }
 
 func NewGRPCHandler(grpcSrv *grpc.Server, service services.StockService) {
+	if service == nil {
+		panic("service is nil")
+	}
 	handler := &serverAPI{
 		service: service,
 	}
@@ -46,5 +51,23 @@ func (s *serverAPI) GetAvailability(ctx context.Context, req *pb.GetAvailability
 
 	return &pb.GetAvailabilityResponse{
 		Available: inStock,
+	}, nil
+}
+
+func (s *serverAPI) Reserve(ctx context.Context, req *pb.ReserveRequest) (*pb.ReserveResponse, error) {
+
+	from := req.From.AsTime()
+	to := req.To.AsTime()
+	log.Info("to: ", to)
+
+	reservation, err := s.service.Reserve(ctx, req.Id, req.OrderId, from, to)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	log.Info("reservation: ", reservation)
+
+	return &pb.ReserveResponse{
+		ReservationId: reservation.ID.String(),
+		ExpiresAt:     timestamppb.New(reservation.ExpiresAt),
 	}, nil
 }

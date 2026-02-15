@@ -27,6 +27,7 @@ func NewStockGateway(grpcAddr string) (services.StockGateway, error) {
 
 	return &stockGateway{
 		clientStock: stockClient,
+		conn:        client,
 	}, nil
 }
 

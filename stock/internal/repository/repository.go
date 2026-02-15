@@ -18,7 +18,7 @@ var (
 )
 
 type ParkingSpot interface {
-	Get(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (bool, error)
+	Get(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (string, error)
 }
 
 type SpotReservation interface {
@@ -62,36 +62,41 @@ func NewPostgresDB(url string) (*sql.DB, error) {
 //	return r.db.Close()
 //}
 
-func (r *ParkingSpotRepository) Get(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (bool, error) {
+func (r *ParkingSpotRepository) Get(ctx context.Context, lotID uuid.UUID, from, to time.Time) (string, error) {
 	const op = "stock.repository.Get"
 
-	row := r.db.QueryRowContext(ctx,
-		"SELECT EXISTS ("+
-			"SELECT 1 "+
-			"FROM stock.parking_spots ps "+
-			"WHERE ps.parking_lot_id = $1 "+
-			"AND NOT EXISTS ("+
-			"SELECT 1 "+
-			"FROM stock.spot_reservations sr "+
-			"WHERE sr.parking_spot_id = ps.id "+
-			"AND sr.status IN ('pending', 'confirmed') "+
-			"AND NOT (sr.ends_at <= $2 OR sr.starts_at >= $3)));", id, from, to)
+	query := `
+	SELECT ps.id
+	FROM stock.parking_spots ps
+	WHERE ps.parking_lot_id = $1
+	AND NOT EXISTS (
+		SELECT 1
+		FROM stock.spot_reservations sr
+		WHERE sr.parking_spot_id = ps.id
+		AND sr.status IN ('pending', 'confirmed')
+		AND NOT (sr.ends_at <= $2 OR sr.starts_at >= $3)
+	)
+	LIMIT 1;`
 
-	var exists bool
-	if err := row.Scan(&exists); err != nil {
-		return false, fmt.Errorf("%s %w", op, err)
+	var spotID string
+	err := r.db.QueryRowContext(ctx, query, lotID, from, to).Scan(&spotID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", fmt.Errorf("%s no free spots", op)
+		}
+		return "", fmt.Errorf("%s %w", op, err)
 	}
 
-	return exists, nil
+	return spotID, nil
 }
 
 func (r *SpotReservationRepository) Create(ctx context.Context, tx tx.Tx, res *models.Reservation) error {
 	const op = "stock.repository.Create"
 
 	_, err := tx.ExecContext(ctx,
-		`INSERT INTO stock.spot_reservations (id, order_id, expires_at, created_at, parking_spot_id, starts_at, ends_at, status)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		res.ID, res.OrderID, res.ExpiresAt, res.CreatedAt, res.ParkingSpotID, res.StartsAt, res.EndsAt, res.Status)
+		`INSERT INTO stock.spot_reservations (order_id, expires_at, created_at, parking_spot_id, starts_at, ends_at, status)
+				VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		res.OrderID, res.ExpiresAt, res.CreatedAt, res.ParkingSpotID, res.StartsAt, res.EndsAt, res.Status)
 
 	if err != nil {
 		return fmt.Errorf("%s %w", op, err)

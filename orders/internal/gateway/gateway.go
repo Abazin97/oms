@@ -8,6 +8,6 @@ import (
 )
 
 type StockGateway interface {
-	Reserve(context.Context, string, string, time.Time, time.Time) (*stock.ReserveResponse, error)
+	Reserve(ctx context.Context, lotID string, orderID string, from time.Time, to time.Time) (*stock.ReserveResponse, error)
 	Close() error
 }

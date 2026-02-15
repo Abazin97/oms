@@ -35,11 +35,14 @@ func (g *ordersGateway) CreateOrder(ctx context.Context, cr *pbo.CreateOrderRequ
 
 	resp, err := g.clientOrders.CreateOrder(ctx, &pbo.CreateOrderRequest{
 		CustomerId: cr.CustomerId,
+		Id:         cr.Id,
 		Items:      cr.Items,
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	// by Artem TOPSKIY
 
 	return resp, nil
 }
