@@ -19,7 +19,7 @@ type StockService interface {
 	Reserve(ctx context.Context, lotID string, orderID string, from time.Time, to time.Time) (*models.Reservation, error)
 	//Release(ctx context.Context, reservationID uuid.UUID) error
 	//Confirm(ctx context.Context, reservationID uuid.UUID) error
-	GetAvailability(ctx context.Context, lotID uuid.UUID, from time.Time, to time.Time) (string, error)
+	GetAvailability(ctx context.Context, lotID uuid.UUID, from time.Time, to time.Time) (bool, error)
 }
 
 type stockService struct {
@@ -32,12 +32,12 @@ func NewStockService(tx tx.TxManager, spotRepository repository.ParkingSpot, res
 	return &stockService{tx: tx, parkingSpotRepo: spotRepository, spotReservationRepo: reservationRepository}
 }
 
-func (s *stockService) GetAvailability(ctx context.Context, lotID uuid.UUID, from time.Time, to time.Time) (string, error) {
+func (s *stockService) GetAvailability(ctx context.Context, lotID uuid.UUID, from time.Time, to time.Time) (bool, error) {
 	const op = "stock.services.GetAvailability"
 
 	available, err := s.parkingSpotRepo.Get(ctx, lotID, from, to)
 	if err != nil {
-		return "", fmt.Errorf("%s: %w", op, err)
+		return false, fmt.Errorf("%s: %w", op, err)
 	}
 
 	return available, nil
@@ -51,7 +51,7 @@ func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string
 		return nil, fmt.Errorf("%s: invalid lotID: %w", op, err)
 	}
 
-	spotID, err := s.parkingSpotRepo.Get(ctx, lotUUID, from, to)
+	spotID, err := s.spotReservationRepo.Get(ctx, lotUUID, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}

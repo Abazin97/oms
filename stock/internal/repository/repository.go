@@ -18,12 +18,12 @@ var (
 )
 
 type ParkingSpot interface {
-	Get(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (string, error)
+	Get(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (bool, error)
 }
 
 type SpotReservation interface {
 	Create(ctx context.Context, tx tx.Tx, r *models.Reservation) error
-	//Get(ctx context.Context, id uuid.UUID) (*models.Reservation, error)
+	Get(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (string, error)
 	//Update(ctx context.Context, tx tx.Tx, id uuid.UUID, status string) error
 	//DeleteExpired(ctx context.Context, tx tx.Tx, now time.Time) ([]models.Reservation, error)
 }
@@ -62,7 +62,30 @@ func NewPostgresDB(url string) (*sql.DB, error) {
 //	return r.db.Close()
 //}
 
-func (r *ParkingSpotRepository) Get(ctx context.Context, lotID uuid.UUID, from, to time.Time) (string, error) {
+func (r *ParkingSpotRepository) Get(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (bool, error) {
+	const op = "stock.repository.Get"
+
+	row := r.db.QueryRowContext(ctx,
+		"SELECT EXISTS ("+
+			"SELECT 1 "+
+			"FROM stock.parking_spots ps "+
+			"WHERE ps.parking_lot_id = $1 "+
+			"AND NOT EXISTS ("+
+			"SELECT 1 "+
+			"FROM stock.spot_reservations sr "+
+			"WHERE sr.parking_spot_id = ps.id "+
+			"AND sr.status IN ('pending', 'confirmed') "+
+			"AND NOT (sr.ends_at <= $2 OR sr.starts_at >= $3)));", id, from, to)
+
+	var exists bool
+	if err := row.Scan(&exists); err != nil {
+		return false, fmt.Errorf("%s %w", op, err)
+	}
+
+	return exists, nil
+}
+
+func (r *SpotReservationRepository) Get(ctx context.Context, lotID uuid.UUID, from, to time.Time) (string, error) {
 	const op = "stock.repository.Get"
 
 	query := `

@@ -119,7 +119,9 @@ func (h *handler) getStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	WriteJSON(w, http.StatusOK, s.Available)
+	WriteJSON(w, http.StatusOK, pbs.GetAvailabilityResponse{
+		Available: s.Available,
+	})
 }
 
 func WriteJSON(w http.ResponseWriter, status int, data any) {
