@@ -79,7 +79,6 @@ func (r *postgresRepository) Create(ctx context.Context, o models.Order) (string
 
 func (r *postgresRepository) Get(ctx context.Context, id string) (models.Order, error) {
 	const op = "orders.repository.Get"
-	//log.Info("Getting order with id %s", id)
 
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT o.id, o.status, o.payment_link, o.customer_id, oi.product_id, oi.name, oi.quantity, oi.price

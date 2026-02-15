@@ -58,14 +58,14 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/google/uuid"
 )
 
 const (
-	yookassaURL  = "https://api.yookassa.ru/v3/payments"
-	shopID       = "1249166"
-	merchantPass = "test_lxtvHSiET9t4OSIGNvIIbmsN1bBgR5jL3iu9I7lL5rg"
+	yookassaURL = "https://api.yookassa.ru/v3/payments"
+	shopID      = "1249166"
 )
 
 type YouKassaRequest struct {
@@ -121,6 +121,7 @@ func main() {
 			return
 		}
 
+		merchantPass := os.Getenv("MERCHANT_PASS")
 		httpReq.SetBasicAuth(shopID, merchantPass)
 		httpReq.Header.Set("Content-Type", "application/json")
 		httpReq.Header.Set("Idempotence-Key", idempotenceKey)

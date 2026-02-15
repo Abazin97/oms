@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/google/uuid"
 )
 
 const (
-	checkoutURL  = "https://abazincloud.ddns.net"
-	yookassaURL  = "https://api.yookassa.ru/v3/payments"
-	shopID       = "1249166"
-	merchantPass = "test_lxtvHSiET9t4OSIGNvIIbmsN1bBgR5jL3iu9I7lL5rg"
+	checkoutURL = "https://abazincloud.ddns.net"
+	yookassaURL = "https://api.yookassa.ru/v3/payments"
+	shopID      = "1249166"
 )
 
 type APIRequest struct {
@@ -87,6 +87,7 @@ func main() {
 		panic(err)
 	}
 
+	merchantPass := os.Getenv("MERCHANT_PASS")
 	httpReq.SetBasicAuth(shopID, merchantPass)
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Idempotence-Key", checkoutRequest.IdempotencyKey)

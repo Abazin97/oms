@@ -25,7 +25,6 @@ type SpotReservation interface {
 	Create(ctx context.Context, tx tx.Tx, r *models.Reservation) error
 	Get(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (string, error)
 	Update(ctx context.Context, tx tx.Tx, reservationID uuid.UUID, status string) error
-	DeleteExpired(ctx context.Context, tx tx.Tx, now time.Time) ([]models.Reservation, error)
 }
 
 type ParkingSpotRepository struct {
