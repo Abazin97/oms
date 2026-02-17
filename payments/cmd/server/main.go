@@ -144,39 +144,39 @@ func main() {
 		w.Write(yooRespBody)
 	})
 
-	http.HandleFunc("/api/payment/notifications", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, "cannot read body", http.StatusBadRequest)
-			return
-		}
-
-		defer r.Body.Close()
-		log.Println(string(body))
-
-		var notification struct {
-			Type   string `json:"type"`
-			Event  string `json:"event"`
-			Object struct {
-				ID     string `json:"id"`
-				Status string `json:"status"`
-				Paid   bool   `json:"paid"`
-			} `json:"object"`
-		}
-
-		if err := json.Unmarshal(body, &notification); err != nil {
-			http.Error(w, "bad json", http.StatusBadRequest)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok"}`))
-	})
-
-	log.Println("Server listening on :4001")
-	log.Fatal(http.ListenAndServe(":4001", nil))
+	//http.HandleFunc("/api/payment/notifications", func(w http.ResponseWriter, r *http.Request) {
+	//	if r.Method != http.MethodPost {
+	//		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	//		return
+	//	}
+	//	body, err := io.ReadAll(r.Body)
+	//	if err != nil {
+	//		http.Error(w, "cannot read body", http.StatusBadRequest)
+	//		return
+	//	}
+	//
+	//	defer r.Body.Close()
+	//	log.Println(string(body))
+	//
+	//	var notification struct {
+	//		Type   string `json:"type"`
+	//		Event  string `json:"event"`
+	//		Object struct {
+	//			ID     string `json:"id"`
+	//			Status string `json:"status"`
+	//			Paid   bool   `json:"paid"`
+	//		} `json:"object"`
+	//	}
+	//
+	//	if err := json.Unmarshal(body, &notification); err != nil {
+	//		http.Error(w, "bad json", http.StatusBadRequest)
+	//		return
+	//	}
+	//
+	//	w.WriteHeader(http.StatusOK)
+	//	w.Write([]byte(`{"status":"ok"}`))
+	//})
+	//
+	//log.Println("Server listening on :4001")
+	//log.Fatal(http.ListenAndServe(":4001", nil))
 }

@@ -30,12 +30,15 @@ func NewGateway(grpcAddr string) (*Gateway, error) {
 	}, nil
 }
 
-func (g *Gateway) UpdateOrder(ctx context.Context, orderID string, paymentLink string) error {
+func (g *Gateway) UpdateOrder(ctx context.Context, orderID string, status string) error {
 	_, err := g.clientOrder.UpdateOrder(ctx, &pb.Order{
-		Id:          orderID,
-		PaymentLink: paymentLink,
-		Status:      "waiting",
+		Id:     orderID,
+		Status: status,
 	})
 
 	return err
+}
+
+func (g *Gateway) Close() error {
+	return g.conn.Close()
 }

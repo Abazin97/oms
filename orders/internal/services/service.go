@@ -8,23 +8,22 @@ import (
 	"orders/internal/gateway"
 	"orders/internal/repository"
 	"time"
-
-	pb "github.com/Abazin97/common/gen/go/order"
 )
 
 type OrdersService interface {
 	CreateOrder(context.Context, string, string, time.Time, time.Time, []models.Item) (*models.Order, error)
 	GetOrder(context.Context, string) (models.Order, error)
-	UpdateOrder(context.Context, string, *pb.Order) (*pb.Order, error)
+	UpdateOrder(context.Context, string, string) (*models.Order, error)
 }
 
 type ordersService struct {
 	repo    repository.Repository
-	gateway gateway.StockGateway
+	stock   gateway.StockGateway
+	payment gateway.PaymentGateway
 }
 
-func NewOrdersService(repo repository.Repository, service gateway.StockGateway) OrdersService {
-	return &ordersService{repo: repo, gateway: service}
+func NewOrdersService(repo repository.Repository, stockService gateway.StockGateway, paymentService gateway.PaymentGateway) OrdersService {
+	return &ordersService{repo: repo, stock: stockService, payment: paymentService}
 }
 
 func (s *ordersService) CreateOrder(ctx context.Context, lotID string, customerID string, from time.Time, to time.Time, products []models.Item) (*models.Order, error) {
@@ -46,15 +45,20 @@ func (s *ordersService) CreateOrder(ctx context.Context, lotID string, customerI
 		"fromTime: ", from,
 		"toTime: ", to)
 
-	_, err = s.gateway.Reserve(ctx, lotID, orderID, from, to)
-	o := &models.Order{
-		CustomerId: customerID,
-		Items:      products,
-		Status:     "pending",
-		Id:         orderID,
+	_, err = s.stock.Reserve(ctx, lotID, orderID, from, to)
+
+	pay, err := s.payment.CreatePayment(ctx, orderID, "2", "RUB")
+	if err != nil {
+		// todo: releasing reservation in case of payment failure
+		//s.stock.Release(ctx, reservationID)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return o, nil
+	err = s.repo.Update(ctx, orderID, pay.Confirmation.ConfirmationURL)
+
+	o, err := s.repo.Get(ctx, orderID)
+
+	return &o, nil
 }
 
 func (s *ordersService) GetOrder(ctx context.Context, id string) (models.Order, error) {
@@ -69,13 +73,15 @@ func (s *ordersService) GetOrder(ctx context.Context, id string) (models.Order, 
 	return o, nil
 }
 
-func (s *ordersService) UpdateOrder(ctx context.Context, id string, o *pb.Order) (*pb.Order, error) {
+func (s *ordersService) UpdateOrder(ctx context.Context, id string, status string) (*models.Order, error) {
 	const op = "order.services.UpdateOrder"
 
-	err := s.repo.Update(ctx, id, models.Order{})
+	err := s.repo.Update(ctx, id, status)
+
+	o, err := s.repo.Get(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return o, nil
+	return &o, nil
 }

@@ -12,7 +12,7 @@ import (
 type Repository interface {
 	Create(context.Context, models.Order) (string, error)
 	Get(context.Context, string) (models.Order, error)
-	Update(context.Context, string, models.Order) error
+	Update(context.Context, string, string) error
 	Close() error
 }
 
@@ -119,13 +119,13 @@ func (r *postgresRepository) Get(ctx context.Context, id string) (models.Order, 
 	return order, rows.Err()
 }
 
-func (r *postgresRepository) Update(ctx context.Context, id string, order models.Order) error {
+func (r *postgresRepository) Update(ctx context.Context, id string, paymentLink string) error {
 	const op = "orders.repository.Update"
 
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE orders.orders 
 				SET status = COALESCE(NULLIF($2, ''), status), payment_link = COALESCE(NULLIF($3, ''), payment_link)
-				WHERE id = $1`, id, order.Status, order.PaymentLink)
+				WHERE id = $1`, id, paymentLink)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}

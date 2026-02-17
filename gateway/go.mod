@@ -3,14 +3,15 @@ module gateway
 go 1.24.9
 
 require (
-	github.com/Abazin97/common v0.2.994
-	google.golang.org/grpc v1.78.0
+	github.com/Abazin97/common v0.3.1
+	github.com/google/uuid v1.6.0
+	google.golang.org/grpc v1.79.1
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
-	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260203192932-546029d2fa20 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	golang.org/x/net v0.50.0 // indirect
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57 // indirect
 )

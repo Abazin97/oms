@@ -113,10 +113,27 @@ func (h *serverAPI) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.
 }
 
 func (h *serverAPI) UpdateOrder(ctx context.Context, o *pb.Order) (*pb.Order, error) {
-	o, err := h.service.UpdateOrder(ctx, o.Id, o)
+	order, err := h.service.UpdateOrder(ctx, o.Id, o.Status)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "Failed to update, order not found")
 	}
 
-	return o, nil
+	items := make([]*pb.Item, 0, len(order.Items))
+	for _, it := range order.Items {
+		items = append(items, &pb.Item{
+			Id:       it.Id,
+			Name:     it.Name,
+			Quantity: it.Quantity,
+			Price:    it.Price,
+		})
+	}
+	resp := &pb.Order{
+		Id:          order.Id,
+		Status:      order.Status,
+		CustomerId:  order.CustomerId,
+		PaymentLink: order.PaymentLink,
+		Items:       items,
+	}
+
+	return resp, nil
 }

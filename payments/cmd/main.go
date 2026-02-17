@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"orders/internal/gateway"
-	"orders/internal/handlers"
-	"orders/internal/repository"
-	"orders/internal/services"
 	"os"
 	"os/signal"
+	"payments/internal/gateway"
+	"payments/internal/handlers"
+	"payments/internal/services"
+	"payments/internal/yookassa"
 	"syscall"
 
 	"github.com/joho/godotenv"
@@ -31,37 +31,21 @@ func main() {
 		log.Info("Error loading .env file")
 	}
 
-	url := os.Getenv("POSTGRES_URL")
-	if url == "" {
-		log.Error("url not set")
-		os.Exit(1)
-	}
-
 	grpcSrv := grpc.NewServer()
 
-	repo, err := repository.NewPostgresRepository(url)
-	if err != nil {
-		log.Error("failed to connect to postgres repository: ", err)
-		os.Exit(1)
-	}
-	defer repo.Close()
-
-	stockGateway, err := gateway.NewStockGateway("localhost:50052")
+	ordersGateway, err := gateway.NewGateway("localhost:50052")
 	if err != nil {
 		log.Error("failed to connect grpc stock service", err)
 		return
 	}
-	//defer stockGateway.Close()
 
-	paymentGateway, err := gateway.NewPaymentGateway("localhost:50053")
-	if err != nil {
-		log.Error("failed to connect grpc payment service", err)
-	}
+	yooClient := yookassa.NewClient()
 
-	ordersService := services.NewOrdersService(repo, stockGateway, paymentGateway)
-	handlers.NewGRPCHandler(grpcSrv, ordersService)
+	paymentService := services.NewPaymentService(ordersGateway, yooClient)
+	handlers.NewPaymentHandler(paymentService)
+	handlers.NewGRPCHandler(grpcSrv, paymentService)
 
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", 50051))
+	l, err := net.Listen("tcp", fmt.Sprintf(":%d", 50053))
 	if err != nil {
 		log.Error("failed to listen: %v", err)
 		os.Exit(1)
@@ -78,7 +62,7 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	stockGateway.Close()
+	ordersGateway.Close()
 	grpcSrv.GracefulStop()
 	log.Info("gRPC server stopped", slog.String("addr", l.Addr().String()))
 
