@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	log "log/slog"
 	"orders/internal/domain/models"
 	"orders/internal/services"
 
@@ -42,10 +41,6 @@ func (h *serverAPI) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "Failed to create order")
 	}
-	log.Info("CreateOrder request",
-		"customerId", req.CustomerId,
-		"itemsCount", len(req.Items),
-	)
 
 	pbItems := make([]*pb.Item, len(createdOrder.Items))
 	for i, item := range createdOrder.Items {

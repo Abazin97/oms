@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"payments/internal/gateway"
@@ -42,13 +43,21 @@ func main() {
 	yooClient := yookassa.NewClient()
 
 	paymentService := services.NewPaymentService(ordersGateway, yooClient)
-	handlers.NewPaymentHandler(paymentService)
 	handlers.NewGRPCHandler(grpcSrv, paymentService)
 
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", 50053))
 	if err != nil {
 		log.Error("failed to listen: %v", err)
 		os.Exit(1)
+	}
+
+	mux := http.NewServeMux()
+	httpHandler := handlers.NewPaymentHandler(paymentService)
+	httpHandler.RegisterRoutes(mux)
+
+	httpSrv := &http.Server{
+		Addr:    "localhost:4001",
+		Handler: mux,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -61,10 +70,18 @@ func main() {
 		}
 	}()
 
+	go func() {
+		log.Info("http server starting :4001")
+		if err := httpSrv.ListenAndServe(); err != nil {
+			log.Error("failed to serve: %v", err)
+		}
+	}()
+
 	<-ctx.Done()
-	ordersGateway.Close()
+	log.Info("shutting down...")
 	grpcSrv.GracefulStop()
-	log.Info("gRPC server stopped", slog.String("addr", l.Addr().String()))
+	httpSrv.Shutdown(context.Background())
+	ordersGateway.Close()
 
 	//if err := repo.Close(); err != nil {
 	//	log.Error("failed to close repository: ", err)

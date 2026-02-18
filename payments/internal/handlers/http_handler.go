@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"payments/internal/domain/models"
 	"payments/internal/services"
 )
 
@@ -21,35 +22,33 @@ func NewPaymentHandler(service services.PaymentService) PaymentHandler {
 }
 
 func (h *paymentHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/payment/notifications", h.HandleYouKassaWebHook)
+	mux.HandleFunc("/api/payment/notifications", h.HandleYouKassaWebHook)
 }
 
 func (h *paymentHandler) HandleYouKassaWebHook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", 405)
+		return
 	}
 
+	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "cannot read body", http.StatusBadRequest)
 		return
 	}
 
-	defer r.Body.Close()
-	log.Println(string(body))
+	log.Println("yookassa webhook: ", string(body))
 
-	var notification struct {
-		Type   string `json:"type"`
-		Event  string `json:"event"`
-		Object struct {
-			ID     string `json:"id"`
-			Status string `json:"status"`
-			Paid   bool   `json:"paid"`
-		} `json:"object"`
-	}
+	var notification models.YouKassaNotification
 
 	if err := json.Unmarshal(body, &notification); err != nil {
 		http.Error(w, "bad json", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.paymentService.HandleYouKassaWebHook(r.Context(), notification); err != nil {
+		http.Error(w, "cannot handle webhook", http.StatusInternalServerError)
 		return
 	}
 

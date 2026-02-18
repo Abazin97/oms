@@ -61,8 +61,7 @@ func (h *handler) createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := internal.CreateOrderResponse{
-		Order:         o,
-		RedirectToURL: o.PaymentLink,
+		Order: o,
 	}
 
 	WriteJSON(w, http.StatusOK, res)
