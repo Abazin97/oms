@@ -55,7 +55,7 @@ func (s *paymentService) HandleYouKassaWebHook(ctx context.Context, n models.You
 	//	return fmt.Errorf("%s: %w", op, err)
 	//}
 
-	err := s.gateway.UpdateOrder(ctx, n.Object.Metadata.OrderID, n.Event)
+	err := s.gateway.UpdateOrder(ctx, n.Object.Metadata.OrderID, "paid")
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}

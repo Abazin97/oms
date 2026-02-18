@@ -2,7 +2,6 @@ package http
 
 import (
 	"encoding/json"
-	"fmt"
 	"gateway/internal"
 	"gateway/internal/services"
 	log "log/slog"
@@ -63,7 +62,7 @@ func (h *handler) createOrder(w http.ResponseWriter, r *http.Request) {
 
 	res := internal.CreateOrderResponse{
 		Order:         o,
-		RedirectToURL: fmt.Sprintf("http://localhost:50051/%s/orders/", o.Id),
+		RedirectToURL: o.PaymentLink,
 	}
 
 	WriteJSON(w, http.StatusOK, res)

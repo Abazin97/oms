@@ -12,7 +12,8 @@ import (
 type Repository interface {
 	Create(context.Context, models.Order) (string, error)
 	Get(context.Context, string) (models.Order, error)
-	Update(context.Context, string, string) error
+	UpdateStatus(ctx context.Context, id string, status string) error
+	UpdatePaymentLink(ctx context.Context, id string, link string) error
 	Close() error
 }
 
@@ -119,13 +120,29 @@ func (r *postgresRepository) Get(ctx context.Context, id string) (models.Order, 
 	return order, rows.Err()
 }
 
-func (r *postgresRepository) Update(ctx context.Context, id string, paymentLink string) error {
-	const op = "orders.repository.Update"
+func (r *postgresRepository) UpdateStatus(ctx context.Context, id string, status string) error {
+	const op = "orders.repository.UpdateStatus"
 
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE orders.orders 
-				SET status = COALESCE(NULLIF($2, ''), status), payment_link = COALESCE(NULLIF($3, ''), payment_link)
-				WHERE id = $1`, id, paymentLink)
+				SET status = 'paid' 
+				WHERE id = $1 AND status != 'paid'`,
+		id, status,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
+func (r *postgresRepository) UpdatePaymentLink(ctx context.Context, id string, link string) error {
+	const op = "orders.repository.UpdatePaymentLink"
+
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE orders.orders SET payment_link = $2 WHERE id = $1`,
+		id, link,
+	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}

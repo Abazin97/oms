@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type serverAPI struct {
@@ -57,10 +58,11 @@ func (h *serverAPI) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest)
 	}
 
 	order := &pb.Order{
-		Id:         createdOrder.Id,
-		Status:     createdOrder.Status,
-		Items:      pbItems,
-		CustomerId: createdOrder.CustomerId,
+		Id:          createdOrder.Id,
+		Status:      createdOrder.Status,
+		Items:       pbItems,
+		CustomerId:  createdOrder.CustomerId,
+		PaymentLink: createdOrder.PaymentLink,
 	}
 
 	return order, nil
@@ -112,28 +114,11 @@ func (h *serverAPI) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.
 	}, nil
 }
 
-func (h *serverAPI) UpdateOrder(ctx context.Context, o *pb.Order) (*pb.Order, error) {
-	order, err := h.service.UpdateOrder(ctx, o.Id, o.Status)
+func (h *serverAPI) UpdateOrder(ctx context.Context, o *pb.UpdateOrderStatusRequest) (*emptypb.Empty, error) {
+	err := h.service.UpdateOrder(ctx, o.OrderId, o.Status)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "Failed to update, order not found")
 	}
 
-	items := make([]*pb.Item, 0, len(order.Items))
-	for _, it := range order.Items {
-		items = append(items, &pb.Item{
-			Id:       it.Id,
-			Name:     it.Name,
-			Quantity: it.Quantity,
-			Price:    it.Price,
-		})
-	}
-	resp := &pb.Order{
-		Id:          order.Id,
-		Status:      order.Status,
-		CustomerId:  order.CustomerId,
-		PaymentLink: order.PaymentLink,
-		Items:       items,
-	}
-
-	return resp, nil
+	return &emptypb.Empty{}, nil
 }

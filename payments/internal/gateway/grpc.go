@@ -31,9 +31,9 @@ func NewGateway(grpcAddr string) (*Gateway, error) {
 }
 
 func (g *Gateway) UpdateOrder(ctx context.Context, orderID string, status string) error {
-	_, err := g.clientOrder.UpdateOrder(ctx, &pb.Order{
-		Id:     orderID,
-		Status: status,
+	_, err := g.clientOrder.UpdateOrder(ctx, &pb.UpdateOrderStatusRequest{
+		OrderId: orderID,
+		Status:  status,
 	})
 
 	return err

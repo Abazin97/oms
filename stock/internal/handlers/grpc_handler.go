@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	log "log/slog"
 	"stock/internal/services"
 
 	pb "github.com/Abazin97/common/gen/go/stock"
@@ -58,13 +57,11 @@ func (s *serverAPI) Reserve(ctx context.Context, req *pb.ReserveRequest) (*pb.Re
 
 	from := req.From.AsTime()
 	to := req.To.AsTime()
-	log.Info("to: ", to)
 
 	reservation, err := s.service.Reserve(ctx, req.Id, req.OrderId, from, to)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	log.Info("reservation: ", reservation)
 
 	return &pb.ReserveResponse{
 		ReservationId: reservation.ID.String(),

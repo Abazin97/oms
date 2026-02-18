@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	log "log/slog"
 	"stock/internal/domain/models"
 	"stock/internal/repository"
 	"stock/internal/tx"
@@ -65,8 +64,6 @@ func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string
 		return nil, fmt.Errorf("%s: invalid orderID: %w", op, err)
 	}
 
-	log.Info("spot id", spotUUID)
-
 	var reservation *models.Reservation
 
 	err = s.tx.WithTx(ctx, func(tx tx.Tx) error {
@@ -92,8 +89,6 @@ func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
-
-	log.Info("reservation: ", reservation)
 
 	return reservation, nil
 }
