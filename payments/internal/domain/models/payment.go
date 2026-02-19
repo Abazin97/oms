@@ -1,10 +1,11 @@
 package models
 
 type YouKassaRequest struct {
-	Amount       Amount       `json:"amount"`
-	Confirmation Confirmation `json:"confirmation"`
-	Capture      bool         `json:"capture"`
-	Description  string       `json:"description"`
+	Amount       Amount            `json:"amount"`
+	Confirmation Confirmation      `json:"confirmation"`
+	Capture      bool              `json:"capture"`
+	Description  string            `json:"description"`
+	Metadata     map[string]string `json:"metadata"`
 }
 
 type Amount struct {
@@ -30,12 +31,10 @@ type YouKassaNotification struct {
 	Type   string `json:"type"`
 	Event  string `json:"event"`
 	Object struct {
-		ID       string `json:"id"`
-		Status   string `json:"status"`
-		Paid     bool   `json:"paid"`
-		Amount   Amount `json:"amount"`
-		Metadata struct {
-			OrderID string `json:"order_id"`
-		} `json:"metadata"`
+		ID       string            `json:"id"`
+		Status   string            `json:"status"`
+		Paid     bool              `json:"paid"`
+		Amount   Amount            `json:"amount"`
+		Metadata map[string]string `json:"metadata"`
 	} `json:"object"`
 }

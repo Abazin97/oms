@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	serviceName = "services"
+	serviceName = "gateway"
 	httpAddr    = "localhost:4000"
 	envLocal    = "local"
 	envProd     = "prod"

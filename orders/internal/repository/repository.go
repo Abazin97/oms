@@ -125,15 +125,15 @@ func (r *postgresRepository) UpdateStatus(ctx context.Context, id string, status
 
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE orders.orders 
-				SET status = 'paid' 
-				WHERE id = $1 AND status != 'paid'`,
+				SET status = $2 
+				WHERE id = $1`,
 		id, status,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	return nil
+	return err
 }
 
 func (r *postgresRepository) UpdatePaymentLink(ctx context.Context, id string, link string) error {

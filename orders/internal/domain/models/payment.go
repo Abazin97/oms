@@ -1,10 +1,11 @@
 package models
 
 type YouKassaRequest struct {
-	Amount       Amount       `json:"amount"`
-	Confirmation Confirmation `json:"confirmation"`
-	Capture      bool         `json:"capture"`
-	Description  string       `json:"description"`
+	Amount       Amount            `json:"amount"`
+	Confirmation Confirmation      `json:"confirmation"`
+	Capture      bool              `json:"capture"`
+	Description  string            `json:"description"`
+	Metadata     map[string]string `json:"metadata"`
 }
 
 type Amount struct {

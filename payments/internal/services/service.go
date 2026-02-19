@@ -38,6 +38,9 @@ func (s *paymentService) CreatePayment(ctx context.Context, orderID string, amou
 		},
 		Capture:     true,
 		Description: "parking payment",
+		Metadata: map[string]string{
+			"orderId": orderID,
+		},
 	}
 
 	return s.yooKassa.CreatePayment(ctx, orderID, req)
@@ -55,12 +58,12 @@ func (s *paymentService) HandleYouKassaWebHook(ctx context.Context, n models.You
 	//	return fmt.Errorf("%s: %w", op, err)
 	//}
 
-	err := s.gateway.UpdateOrder(ctx, n.Object.Metadata.OrderID, "paid")
+	err := s.gateway.UpdateOrder(ctx, n.Object.Metadata["orderId"], "paid")
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	return nil
+	return err
 }
 
 //func (s *paymentService) UpdatePayment(ctx context.Context, orderID string, paymentLink string) error {

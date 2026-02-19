@@ -1,2 +1,4 @@
+github.com/Abazin97/common v0.3.12 h1:WmGV5eaegWI1ZpQ2h5AvN8tSUb4b1YhuMuuEOe7DVgY=
+github.com/Abazin97/common v0.3.12/go.mod h1:4fIlniDLKH81bAZK8QtI0h3xJLgCFGlFZCdAY/dGvDY=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=

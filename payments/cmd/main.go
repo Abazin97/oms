@@ -34,9 +34,9 @@ func main() {
 
 	grpcSrv := grpc.NewServer()
 
-	ordersGateway, err := gateway.NewGateway("localhost:50052")
+	ordersGateway, err := gateway.NewGateway("localhost:50051")
 	if err != nil {
-		log.Error("failed to connect grpc stock service", err)
+		log.Error("failed to connect grpc order service", err)
 		return
 	}
 

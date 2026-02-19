@@ -109,8 +109,8 @@ func (h *serverAPI) GetOrder(ctx context.Context, req *pb.GetOrderRequest) (*pb.
 	}, nil
 }
 
-func (h *serverAPI) UpdateOrder(ctx context.Context, o *pb.UpdateOrderStatusRequest) (*emptypb.Empty, error) {
-	err := h.service.UpdateOrder(ctx, o.OrderId, o.Status)
+func (h *serverAPI) UpdateOrder(ctx context.Context, req *pb.UpdateOrderStatusRequest) (*emptypb.Empty, error) {
+	err := h.service.UpdateOrder(ctx, req.OrderId, req.Status)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "Failed to update, order not found")
 	}
