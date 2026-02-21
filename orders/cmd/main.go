@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"gateway/discovery"
+	"gateway/discovery/consul"
 	"log/slog"
 	"net"
 	"orders/internal/gateway"
@@ -12,14 +14,18 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
 
 const (
-	envLocal = "local"
-	envProd  = "prod"
+	serviceName = "orders"
+	grpcAddr    = "localhost:50051"
+	consulAddr  = "localhost:8500"
+	envLocal    = "local"
+	envProd     = "prod"
 )
 
 func main() {
@@ -30,6 +36,29 @@ func main() {
 	if err != nil {
 		log.Info("Error loading .env file")
 	}
+
+	registry, err := consul.NewRegistry(consulAddr, serviceName)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx := context.Background()
+	instanseID := discovery.GenerateInstanceID(serviceName)
+	if err := registry.Register(ctx, instanseID, serviceName, grpcAddr); err != nil {
+		panic(err)
+	}
+
+	go func() {
+		for {
+			if err := registry.HealthCheck(instanseID, serviceName); err != nil {
+				log.Error(fmt.Sprintf("failed to health check"))
+			}
+
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
+	defer registry.Deregister(ctx, instanseID, serviceName)
 
 	url := os.Getenv("POSTGRES_URL")
 	if url == "" {
@@ -46,22 +75,14 @@ func main() {
 	}
 	defer repo.Close()
 
-	stockGateway, err := gateway.NewStockGateway("localhost:50052")
-	if err != nil {
-		log.Error("failed to connect grpc stock service", err)
-		return
-	}
-	//defer stockGateway.Close()
+	stockGateway := gateway.NewStockGateway(registry)
 
-	paymentGateway, err := gateway.NewPaymentGateway("localhost:50053")
-	if err != nil {
-		log.Error("failed to connect grpc payment service", err)
-	}
+	paymentGateway := gateway.NewPaymentGateway(registry)
 
 	ordersService := services.NewOrdersService(repo, stockGateway, paymentGateway)
 	handlers.NewGRPCHandler(grpcSrv, ordersService)
 
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", 50051))
+	l, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
 		log.Error("failed to listen: %v", err)
 		os.Exit(1)
@@ -78,13 +99,8 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	stockGateway.Close()
 	grpcSrv.GracefulStop()
 	log.Info("gRPC server stopped", slog.String("addr", l.Addr().String()))
-
-	//if err := repo.Close(); err != nil {
-	//	log.Error("failed to close repository: ", err)
-	//}
 }
 
 func setupLogger(env string) *slog.Logger {

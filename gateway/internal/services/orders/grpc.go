@@ -2,38 +2,33 @@ package orders
 
 import (
 	"context"
+	discovery "gateway/discovery"
 	"gateway/internal/services"
-	"time"
+	"log"
 
 	pbo "github.com/Abazin97/common/gen/go/order"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type ordersGateway struct {
-	clientOrders pbo.OrderServiceClient
-	conn         *grpc.ClientConn
+	service discovery.Service
 }
 
-func NewOrdersGateway(grpcAddr string) (services.OrdersGateway, error) {
-	client, err := grpc.NewClient(
-		grpcAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	orderClient := pbo.NewOrderServiceClient(client)
-
+func NewOrdersGateway(service discovery.Service) services.OrdersGateway {
 	return &ordersGateway{
-		clientOrders: orderClient,
-	}, nil
+		service: service,
+	}
 }
 
 func (g *ordersGateway) CreateOrder(ctx context.Context, cr *pbo.CreateOrderRequest) (*pbo.Order, error) {
+	conn, err := discovery.ServiceConnection(context.Background(), "orders", g.service)
+	if err != nil {
+		log.Fatal("failed to dial server: ", err)
+	}
+	defer conn.Close()
 
-	resp, err := g.clientOrders.CreateOrder(ctx, &pbo.CreateOrderRequest{
+	c := pbo.NewOrderServiceClient(conn)
+
+	resp, err := c.CreateOrder(ctx, &pbo.CreateOrderRequest{
 		CustomerId: cr.CustomerId,
 		Id:         cr.Id,
 		Items:      cr.Items,
@@ -48,10 +43,14 @@ func (g *ordersGateway) CreateOrder(ctx context.Context, cr *pbo.CreateOrderRequ
 }
 
 func (g *ordersGateway) GetOrder(ctx context.Context, id string) (*pbo.Order, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
+	conn, err := discovery.ServiceConnection(context.Background(), "orders", g.service)
+	if err != nil {
+		log.Fatal("failed to dial server: ", err)
+	}
+	defer conn.Close()
 
-	resp, err := g.clientOrders.GetOrder(ctx, &pbo.GetOrderRequest{
+	c := pbo.NewOrderServiceClient(conn)
+	resp, err := c.GetOrder(ctx, &pbo.GetOrderRequest{
 		Id: id,
 	})
 	if err != nil {
@@ -59,8 +58,4 @@ func (g *ordersGateway) GetOrder(ctx context.Context, id string) (*pbo.Order, er
 	}
 
 	return resp, nil
-}
-
-func (g *ordersGateway) Close() error {
-	return g.conn.Close()
 }

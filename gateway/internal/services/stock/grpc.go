@@ -2,39 +2,30 @@ package stock
 
 import (
 	"context"
+	discovery2 "gateway/discovery"
 	"gateway/internal/services"
+	"log"
 
 	pbs "github.com/Abazin97/common/gen/go/stock"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type stockGateway struct {
-	clientStock pbs.StockServiceClient
-	conn        *grpc.ClientConn
+	service discovery2.Service
 }
 
-func NewStockGateway(grpcAddr string) (services.StockGateway, error) {
-	client, err := grpc.NewClient(
-		grpcAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	stockClient := pbs.NewStockServiceClient(client)
-
+func NewStockGateway(service discovery2.Service) services.StockGateway {
 	return &stockGateway{
-		clientStock: stockClient,
-		conn:        client,
-	}, nil
+		service: service,
+	}
 }
 
 func (g *stockGateway) GetStock(ctx context.Context, cr *pbs.GetAvailabilityRequest) (*pbs.GetAvailabilityResponse, error) {
-	return g.clientStock.GetAvailability(ctx, cr)
-}
+	conn, err := discovery2.ServiceConnection(context.Background(), "stock", g.service)
+	if err != nil {
+		log.Fatal("failed to dial server: ", err)
+	}
+	defer conn.Close()
 
-func (g *stockGateway) Close() error {
-	return g.conn.Close()
+	c := pbs.NewStockServiceClient(conn)
+	return c.GetAvailability(ctx, cr)
 }

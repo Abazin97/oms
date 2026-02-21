@@ -2,59 +2,45 @@ package gateway
 
 import (
 	"context"
+	"gateway/discovery"
+	"log"
 	"orders/internal/domain/models"
 	"time"
 
 	pbp "github.com/Abazin97/common/gen/go/payment"
 	pbs "github.com/Abazin97/common/gen/go/stock"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type stockGateway struct {
-	clientStock pbs.StockServiceClient
-	conn        *grpc.ClientConn
+	service discovery.Service
 }
 
 type paymentGateway struct {
-	client pbp.PaymentServiceClient
-	conn   *grpc.ClientConn
+	service discovery.Service
 }
 
-func NewStockGateway(grpcAddr string) (StockGateway, error) {
-	client, err := grpc.NewClient(
-		grpcAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	stockClient := pbs.NewStockServiceClient(client)
-
+func NewStockGateway(service discovery.Service) StockGateway {
 	return &stockGateway{
-		clientStock: stockClient,
-		conn:        client,
-	}, nil
+		service: service,
+	}
 }
 
-func NewPaymentGateway(grpcAddr string) (PaymentGateway, error) {
-	conn, err := grpc.NewClient(grpcAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, err
-	}
-
+func NewPaymentGateway(service discovery.Service) PaymentGateway {
 	return &paymentGateway{
-		client: pbp.NewPaymentServiceClient(conn),
-		conn:   conn,
-	}, nil
+		service: service,
+	}
 }
 
 func (g *stockGateway) Reserve(ctx context.Context, lotID string, orderID string, from time.Time, to time.Time) (*pbs.ReserveResponse, error) {
-	return g.clientStock.Reserve(ctx, &pbs.ReserveRequest{
+	conn, err := discovery.ServiceConnection(context.Background(), "stock", g.service)
+	if err != nil {
+		log.Fatal("failed to dial server: ", err)
+	}
+	defer conn.Close()
+
+	c := pbs.NewStockServiceClient(conn)
+	return c.Reserve(ctx, &pbs.ReserveRequest{
 		Id:      lotID,
 		OrderId: orderID,
 		To:      timestamppb.New(to),
@@ -62,12 +48,15 @@ func (g *stockGateway) Reserve(ctx context.Context, lotID string, orderID string
 	})
 }
 
-func (g *stockGateway) Close() error {
-	return g.conn.Close()
-}
-
 func (g *paymentGateway) CreatePayment(ctx context.Context, orderID string, amount string, currency string) (*models.YouKassaResponse, error) {
-	resp, err := g.client.CreatePayment(ctx, &pbp.CreatePaymentRequest{
+	conn, err := discovery.ServiceConnection(context.Background(), "payment", g.service)
+	if err != nil {
+		log.Fatal("failed to dial server: ", err)
+	}
+	defer conn.Close()
+
+	c := pbp.NewPaymentServiceClient(conn)
+	resp, err := c.CreatePayment(ctx, &pbp.CreatePaymentRequest{
 		OrderId:  orderID,
 		Amount:   amount,
 		Currency: currency,

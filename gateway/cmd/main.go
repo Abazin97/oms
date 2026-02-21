@@ -1,17 +1,23 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"gateway/discovery"
+	"gateway/discovery/consul"
 	delivery "gateway/internal/http"
 	"gateway/internal/services/orders"
 	"gateway/internal/services/stock"
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 )
 
 var (
 	serviceName = "gateway"
 	httpAddr    = "localhost:4000"
+	consulAddr  = "localhost:8500"
 	envLocal    = "local"
 	envProd     = "prod"
 )
@@ -20,22 +26,33 @@ func main() {
 	const op = "gateway"
 	log := setupLogger(envLocal)
 
+	registry, err := consul.NewRegistry(consulAddr, serviceName)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx := context.Background()
+	instanseID := discovery.GenerateInstanceID(serviceName)
+	if err := registry.Register(ctx, instanseID, serviceName, httpAddr); err != nil {
+		panic(err)
+	}
+
+	go func() {
+		for {
+			if err := registry.HealthCheck(instanseID, serviceName); err != nil {
+				log.Error(fmt.Sprintf("failed to health check"))
+			}
+
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
+	defer registry.Deregister(ctx, instanseID, serviceName)
+
+	ordersGateway := orders.NewOrdersGateway(registry)
+	stocksGateway := stock.NewStockGateway(registry)
+
 	mux := http.NewServeMux()
-
-	ordersGateway, err := orders.NewOrdersGateway("localhost:50051")
-	if err != nil {
-		log.Error("failed to connect grpc orders service", err)
-		return
-	}
-	defer ordersGateway.Close()
-
-	stocksGateway, err := stock.NewStockGateway("localhost:50052")
-	if err != nil {
-		log.Error("failed to connect grpc stock service", err)
-		return
-	}
-	defer stocksGateway.Close()
-
 	handler := delivery.NewHandler(ordersGateway, stocksGateway)
 	handler.RegisterRoutes(mux)
 

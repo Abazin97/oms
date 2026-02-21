@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"gateway/discovery"
+	"gateway/discovery/consul"
 	"log/slog"
 	"net"
 	"net/http"
@@ -13,14 +15,18 @@ import (
 	"payments/internal/services"
 	"payments/internal/yookassa"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
 
 const (
-	envLocal = "local"
-	envProd  = "prod"
+	serviceName = "payments"
+	grpcAddr    = "localhost:50053"
+	consulAddr  = "localhost:8500"
+	envLocal    = "local"
+	envProd     = "prod"
 )
 
 func main() {
@@ -32,13 +38,32 @@ func main() {
 		log.Info("Error loading .env file")
 	}
 
+	registry, err := consul.NewRegistry(consulAddr, serviceName)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx := context.Background()
+	instanseID := discovery.GenerateInstanceID(serviceName)
+	if err := registry.Register(ctx, instanseID, serviceName, grpcAddr); err != nil {
+		panic(err)
+	}
+
+	go func() {
+		for {
+			if err := registry.HealthCheck(instanseID, serviceName); err != nil {
+				log.Error(fmt.Sprintf("failed to health check"))
+			}
+
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
+	defer registry.Deregister(ctx, instanseID, serviceName)
+
 	grpcSrv := grpc.NewServer()
 
-	ordersGateway, err := gateway.NewGateway("localhost:50051")
-	if err != nil {
-		log.Error("failed to connect grpc order service", err)
-		return
-	}
+	ordersGateway := gateway.NewGateway(registry)
 
 	yooClient := yookassa.NewClient()
 
@@ -81,11 +106,6 @@ func main() {
 	log.Info("shutting down...")
 	grpcSrv.GracefulStop()
 	httpSrv.Shutdown(context.Background())
-	ordersGateway.Close()
-
-	//if err := repo.Close(); err != nil {
-	//	log.Error("failed to close repository: ", err)
-	//}
 }
 
 func setupLogger(env string) *slog.Logger {

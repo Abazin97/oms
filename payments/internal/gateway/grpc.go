@@ -2,43 +2,39 @@ package gateway
 
 import (
 	"context"
+	"gateway/discovery"
+	log "log/slog"
 
 	pb "github.com/Abazin97/common/gen/go/order"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"golang.org/x/exp/slog"
 )
 
 type Gateway struct {
-	clientOrder pb.OrderServiceClient
-	conn        *grpc.ClientConn
+	service discovery.Service
 }
 
-func NewGateway(grpcAddr string) (*Gateway, error) {
-	client, err := grpc.NewClient(
-		grpcAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	orderClient := pb.NewOrderServiceClient(client)
-
+func NewGateway(service discovery.Service) *Gateway {
 	return &Gateway{
-		clientOrder: orderClient,
-		conn:        client,
-	}, nil
+		service: service,
+	}
 }
 
 func (g *Gateway) UpdateOrder(ctx context.Context, orderID string, status string) error {
-	_, err := g.clientOrder.UpdateOrder(ctx, &pb.UpdateOrderStatusRequest{
+	conn, err := discovery.ServiceConnection(context.Background(), "order", g.service)
+	if err != nil {
+		log.Error("failed to dial server: ", err)
+	}
+	defer conn.Close()
+
+	c := pb.NewOrderServiceClient(conn)
+
+	_, err = c.UpdateOrder(ctx, &pb.UpdateOrderStatusRequest{
 		OrderId: orderID,
 		Status:  status,
 	})
+	if err != nil {
+		log.Error("failed to update order", slog.String("error", err.Error()))
+	}
 
 	return err
-}
-
-func (g *Gateway) Close() error {
-	return g.conn.Close()
 }

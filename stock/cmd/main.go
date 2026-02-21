@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"gateway/discovery"
+	"gateway/discovery/consul"
 	"log/slog"
 	"net"
 	"os"
@@ -12,14 +14,18 @@ import (
 	"stock/internal/services"
 	"stock/internal/tx"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
 
 const (
-	envLocal = "local"
-	envProd  = "prod"
+	serviceName = "stock"
+	grpcAddr    = "localhost:50052"
+	consulAddr  = "localhost:8500"
+	envLocal    = "local"
+	envProd     = "prod"
 )
 
 func main() {
@@ -34,6 +40,29 @@ func main() {
 	if url == "" {
 		log.Error("url not set")
 	}
+
+	registry, err := consul.NewRegistry(consulAddr, serviceName)
+	if err != nil {
+		panic(err)
+	}
+
+	ctx := context.Background()
+	instanseID := discovery.GenerateInstanceID(serviceName)
+	if err := registry.Register(ctx, instanseID, serviceName, grpcAddr); err != nil {
+		panic(err)
+	}
+
+	go func() {
+		for {
+			if err := registry.HealthCheck(instanseID, serviceName); err != nil {
+				log.Error(fmt.Sprintf("failed to health check"))
+			}
+
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
+	defer registry.Deregister(ctx, instanseID, serviceName)
 
 	grpcSrv := grpc.NewServer()
 
@@ -51,7 +80,7 @@ func main() {
 	stockService := services.NewStockService(txManager, parkingRepo, reservationRepo)
 	handlers.NewGRPCHandler(grpcSrv, stockService)
 
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", 50052))
+	l, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
 		log.Error("failed to listen: %v", err)
 		os.Exit(1)
@@ -70,10 +99,6 @@ func main() {
 	<-ctx.Done()
 	grpcSrv.GracefulStop()
 	log.Info("gRPC server stopped", slog.String("addr", l.Addr().String()))
-
-	//if err := parkingRepo.Close(); err != nil {
-	//	log.Error("failed to close repository: ", err)
-	//}
 }
 
 func setupLogger(env string) *slog.Logger {

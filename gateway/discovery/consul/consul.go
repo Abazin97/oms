@@ -53,7 +53,7 @@ func (s *Service) Register(ctx context.Context, instanceID string, serviceName s
 	})
 }
 
-func (s *Service) Deregister(ctx context.Context, instanceID string) error {
+func (s *Service) Deregister(ctx context.Context, instanceID string, serviceName string) error {
 	log.Printf("deregistering service %s", instanceID)
 	return s.client.Agent().CheckDeregister(instanceID)
 }

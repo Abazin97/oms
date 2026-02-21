@@ -29,7 +29,7 @@ func NewHandler(ordersGateway services.OrdersGateway, stockGateway services.Stoc
 
 func (h *handler) RegisterRoutes(mux *http.ServeMux) {
 
-	mux.Handle("/", http.FileServer(http.Dir("public")))
+	//mux.Handle("/", http.FileServer(http.Dir("public")))
 
 	mux.HandleFunc("POST /api/{customerID}/orders", h.createOrder)
 
