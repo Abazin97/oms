@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
 
@@ -13,6 +14,10 @@ func ServiceConnection(ctx context.Context, serviceName string, registry Service
 	addrs, err := registry.Discover(ctx, serviceName)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(addrs) == 0 {
+		return nil, fmt.Errorf("service %s has no discovery service", serviceName)
 	}
 
 	log.Printf("Discovered %d instances of %s", len(addrs), serviceName)

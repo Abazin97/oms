@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"gateway/discovery"
 	"gateway/discovery/consul"
+	"gateway/rabbitmq"
 	"log/slog"
 	"net"
+	"orders/internal/consumer"
 	"orders/internal/gateway"
 	"orders/internal/handlers"
 	"orders/internal/repository"
@@ -21,11 +23,15 @@ import (
 )
 
 const (
-	serviceName = "orders"
-	grpcAddr    = "localhost:50051"
-	consulAddr  = "localhost:8500"
 	envLocal    = "local"
 	envProd     = "prod"
+	serviceName = "order"
+	grpcAddr    = "localhost:50051"
+	consulAddr  = "localhost:8500"
+	amqpUser    = "guest"
+	amqpPass    = "guest"
+	amqpHost    = "localhost"
+	amqpPort    = "5672"
 )
 
 func main() {
@@ -60,6 +66,12 @@ func main() {
 
 	defer registry.Deregister(ctx, instanseID, serviceName)
 
+	ch, close := rabbitmq.Connect(amqpUser, amqpPass, amqpHost, amqpPort)
+	defer func() {
+		ch.Close()
+		close()
+	}()
+
 	url := os.Getenv("POSTGRES_URL")
 	if url == "" {
 		log.Error("url not set")
@@ -80,7 +92,10 @@ func main() {
 	paymentGateway := gateway.NewPaymentGateway(registry)
 
 	ordersService := services.NewOrdersService(repo, stockGateway, paymentGateway)
-	handlers.NewGRPCHandler(grpcSrv, ordersService)
+	handlers.NewGRPCHandler(grpcSrv, ordersService, ch)
+
+	c := consumer.NewConsumer(ordersService)
+	go c.Listen(ctx, ch)
 
 	l, err := net.Listen("tcp", grpcAddr)
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 type OrdersService interface {
 	CreateOrder(context.Context, string, string, time.Time, time.Time, []models.Item) (*models.Order, error)
 	GetOrder(context.Context, string) (models.Order, error)
-	UpdateOrder(context.Context, string, string) error
+	UpdateOrder(ctx context.Context, id string, status string) error
 }
 
 type ordersService struct {

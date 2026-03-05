@@ -2,11 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"gateway/rabbitmq"
 	"io"
 	"log"
 	"net/http"
 	"payments/internal/domain/models"
 	"payments/internal/services"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type PaymentHandler interface {
@@ -15,10 +18,13 @@ type PaymentHandler interface {
 
 type paymentHandler struct {
 	paymentService services.PaymentService
+	channel        *amqp.Channel
 }
 
-func NewPaymentHandler(service services.PaymentService) PaymentHandler {
-	return &paymentHandler{paymentService: service}
+func NewPaymentHandler(service services.PaymentService, channel *amqp.Channel) PaymentHandler {
+	return &paymentHandler{
+		paymentService: service,
+		channel:        channel}
 }
 
 func (h *paymentHandler) RegisterRoutes(mux *http.ServeMux) {
@@ -50,6 +56,43 @@ func (h *paymentHandler) HandleYouKassaWebHook(w http.ResponseWriter, r *http.Re
 	if err := h.paymentService.HandleYouKassaWebHook(r.Context(), notification); err != nil {
 		http.Error(w, "cannot handle webhook", http.StatusInternalServerError)
 		return
+	}
+
+	if notification.Object.Status == "succeeded" {
+		orderID := notification.Object.Metadata["orderID"]
+		amount := notification.Object.Amount.Value
+		currency := notification.Object.Amount.Currency
+
+		o := map[string]string{
+			"orderID":  orderID,
+			"amount":   amount,
+			"currency": currency,
+			"status":   "paid",
+		}
+
+		body, err := json.Marshal(o)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		err = h.channel.PublishWithContext(
+			r.Context(),
+			rabbitmq.OrderPaidEvent,
+			"",
+			false,
+			false,
+			amqp.Publishing{
+				ContentType:  "application/json",
+				Body:         body,
+				DeliveryMode: amqp.Persistent,
+			})
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		log.Println("message published: order.paid", orderID)
 	}
 
 	w.WriteHeader(http.StatusOK)

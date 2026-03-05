@@ -15,11 +15,11 @@ import (
 )
 
 var (
+	envLocal    = "local"
+	envProd     = "prod"
 	serviceName = "gateway"
 	httpAddr    = "localhost:4000"
 	consulAddr  = "localhost:8500"
-	envLocal    = "local"
-	envProd     = "prod"
 )
 
 func main() {

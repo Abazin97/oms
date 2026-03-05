@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"gateway/discovery"
 	"gateway/discovery/consul"
+	"gateway/rabbitmq"
 	"log/slog"
 	"net"
 	"os"
 	"os/signal"
+	"stock/internal/consumer"
 	"stock/internal/handlers"
 	"stock/internal/repository"
 	"stock/internal/services"
@@ -21,11 +23,15 @@ import (
 )
 
 const (
+	envLocal    = "local"
+	envProd     = "prod"
 	serviceName = "stock"
 	grpcAddr    = "localhost:50052"
 	consulAddr  = "localhost:8500"
-	envLocal    = "local"
-	envProd     = "prod"
+	amqpUser    = "guest"
+	amqpPass    = "guest"
+	amqpHost    = "localhost"
+	amqpPort    = "5672"
 )
 
 func main() {
@@ -64,6 +70,12 @@ func main() {
 
 	defer registry.Deregister(ctx, instanseID, serviceName)
 
+	ch, close := rabbitmq.Connect(amqpUser, amqpPass, amqpHost, amqpPort)
+	defer func() {
+		ch.Close()
+		close()
+	}()
+
 	grpcSrv := grpc.NewServer()
 
 	db, err := repository.NewPostgresDB(url)
@@ -78,7 +90,10 @@ func main() {
 
 	txManager := tx.NewTxManager(db)
 	stockService := services.NewStockService(txManager, parkingRepo, reservationRepo)
-	handlers.NewGRPCHandler(grpcSrv, stockService)
+	handlers.NewGRPCHandler(grpcSrv, stockService, ch)
+
+	c := consumer.NewConsumer()
+	go c.Listen(ch)
 
 	l, err := net.Listen("tcp", grpcAddr)
 	if err != nil {

@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"gateway/discovery"
 	"gateway/discovery/consul"
+	"gateway/rabbitmq"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"payments/internal/consumer"
 	"payments/internal/gateway"
 	"payments/internal/handlers"
 	"payments/internal/services"
@@ -22,11 +24,15 @@ import (
 )
 
 const (
-	serviceName = "payments"
-	grpcAddr    = "localhost:50053"
-	consulAddr  = "localhost:8500"
 	envLocal    = "local"
 	envProd     = "prod"
+	serviceName = "payment"
+	grpcAddr    = "localhost:50053"
+	consulAddr  = "localhost:8500"
+	amqpUser    = "guest"
+	amqpPass    = "guest"
+	amqpHost    = "localhost"
+	amqpPort    = "5672"
 )
 
 func main() {
@@ -61,6 +67,14 @@ func main() {
 
 	defer registry.Deregister(ctx, instanseID, serviceName)
 
+	ch, close := rabbitmq.Connect(amqpUser, amqpPass, amqpHost, amqpPort)
+	defer func() {
+		ch.Close()
+		close()
+	}()
+
+	// todo: add amqp consumer
+
 	grpcSrv := grpc.NewServer()
 
 	ordersGateway := gateway.NewGateway(registry)
@@ -70,6 +84,9 @@ func main() {
 	paymentService := services.NewPaymentService(ordersGateway, yooClient)
 	handlers.NewGRPCHandler(grpcSrv, paymentService)
 
+	c := consumer.NewConsumer(paymentService)
+	go c.Listen(ctx, ch)
+
 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", 50053))
 	if err != nil {
 		log.Error("failed to listen: %v", err)
@@ -77,7 +94,7 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	httpHandler := handlers.NewPaymentHandler(paymentService)
+	httpHandler := handlers.NewPaymentHandler(paymentService, ch)
 	httpHandler.RegisterRoutes(mux)
 
 	httpSrv := &http.Server{

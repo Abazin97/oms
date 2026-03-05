@@ -2,10 +2,14 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
+	"gateway/rabbitmq"
+	"log"
 	"orders/internal/domain/models"
 	"orders/internal/services"
 
 	pb "github.com/Abazin97/common/gen/go/order"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -16,16 +20,23 @@ type serverAPI struct {
 	pb.UnimplementedOrderServiceServer
 
 	service services.OrdersService
+	channel *amqp.Channel
 }
 
-func NewGRPCHandler(grpcSrv *grpc.Server, service services.OrdersService) {
+func NewGRPCHandler(grpcSrv *grpc.Server, service services.OrdersService, channel *amqp.Channel) {
 	handler := &serverAPI{
 		service: service,
+		channel: channel,
 	}
 	pb.RegisterOrderServiceServer(grpcSrv, handler)
 }
 
 func (h *serverAPI) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (*pb.Order, error) {
+	q, err := h.channel.QueueDeclare(rabbitmq.OrderCreatedEvent, true, false, false, false, nil)
+	if err != nil {
+		log.Printf("Failed to declare a queue: %s", err)
+	}
+
 	items := make([]models.Item, len(req.Items))
 	for i, item := range req.Items {
 		items[i] = models.Item{
@@ -58,6 +69,20 @@ func (h *serverAPI) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest)
 		Items:       pbItems,
 		CustomerId:  createdOrder.CustomerId,
 		PaymentLink: createdOrder.PaymentLink,
+	}
+
+	body, err := json.Marshal(order)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "Failed to marshal order")
+	}
+
+	err = h.channel.PublishWithContext(ctx, "", q.Name, false, false, amqp.Publishing{
+		DeliveryMode: amqp.Persistent,
+		ContentType:  "application/json",
+		Body:         body,
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, "Failed to publish order")
 	}
 
 	return order, nil
