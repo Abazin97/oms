@@ -49,8 +49,14 @@ func (s *ordersService) CreateOrder(ctx context.Context, lotID string, customerI
 	}
 
 	err = s.repo.UpdatePaymentLink(ctx, orderID, pay.Confirmation.ConfirmationURL)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
 
 	o, err := s.repo.Get(ctx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
 
 	return &o, nil
 }

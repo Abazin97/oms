@@ -53,16 +53,16 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 					return
 				}
 
-				var p models.YouKassaRequest
+				var p models.OrderPaidEvent
 				if err := json.Unmarshal(d.Body, &p); err != nil {
 					log.Printf("Failed to unmarshal payload: %s", err)
 					d.Nack(false, false)
 					continue
 				}
 
-				orderID := p.Metadata["orderID"]
-				amount := p.Amount.Value
-				currency := p.Amount.Currency
+				orderID := p.OrderID
+				amount := p.Amount
+				currency := p.Currency
 
 				paymentLink, err := c.service.CreatePayment(ctx, orderID, amount, currency)
 				if err != nil {

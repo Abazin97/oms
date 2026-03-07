@@ -59,7 +59,7 @@ func (h *paymentHandler) HandleYouKassaWebHook(w http.ResponseWriter, r *http.Re
 	}
 
 	if notification.Object.Status == "succeeded" {
-		orderID := notification.Object.Metadata["orderID"]
+		orderID := notification.Object.Metadata["orderId"]
 		amount := notification.Object.Amount.Value
 		currency := notification.Object.Amount.Currency
 

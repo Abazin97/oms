@@ -20,7 +20,7 @@ func NewOrdersGateway(service discovery.Service) services.OrdersGateway {
 }
 
 func (g *ordersGateway) CreateOrder(ctx context.Context, cr *pbo.CreateOrderRequest) (*pbo.Order, error) {
-	conn, err := discovery.ServiceConnection(context.Background(), "orders", g.service)
+	conn, err := discovery.ServiceConnection(context.Background(), "order", g.service)
 	if err != nil {
 		log.Fatal("failed to dial server: ", err)
 	}
@@ -43,7 +43,7 @@ func (g *ordersGateway) CreateOrder(ctx context.Context, cr *pbo.CreateOrderRequ
 }
 
 func (g *ordersGateway) GetOrder(ctx context.Context, id string) (*pbo.Order, error) {
-	conn, err := discovery.ServiceConnection(context.Background(), "orders", g.service)
+	conn, err := discovery.ServiceConnection(context.Background(), "order", g.service)
 	if err != nil {
 		log.Fatal("failed to dial server: ", err)
 	}

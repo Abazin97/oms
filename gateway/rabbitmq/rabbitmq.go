@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -11,6 +12,7 @@ import (
 const (
 	OrderCreatedEvent = "order.created"
 	OrderPaidEvent    = "order.paid"
+	MaxRetryCount     = 3
 )
 
 func Connect(user, pass, host string, port string) (*amqp.Channel, func() error) {
@@ -48,7 +50,15 @@ func HandleRetry(ch *amqp.Channel, d *amqp.Delivery) error {
 	if !ok {
 		retryCount = 0
 	}
-	d.Headers["retry_count"] = retryCount + 1
+
+	if retryCount >= MaxRetryCount {
+		log.Printf("message exceeded retry limit (%d), dropping", retryCount)
+		return nil
+	}
+	retryCount++
+	d.Headers["retry_count"] = retryCount
+
+	time.Sleep(time.Second * time.Duration(retryCount))
 
 	return ch.PublishWithContext(
 		context.Background(),
