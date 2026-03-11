@@ -20,6 +20,7 @@ type OrdersService interface {
 	CreateOrder(ctx context.Context, lotID string, customerID string, from time.Time, to time.Time, items []models.Item) (*models.Order, error)
 	GetOrder(context.Context, string) (models.Order, error)
 	UpdateOrder(ctx context.Context, id string, status string) error
+	UpdatePaymentLink(ctx context.Context, orderID string, paymentLink string) error
 }
 
 type ordersService struct {
@@ -115,4 +116,8 @@ func (s *ordersService) UpdateOrder(ctx context.Context, id string, status strin
 	}
 
 	return nil
+}
+
+func (s *ordersService) UpdatePaymentLink(ctx context.Context, orderID string, link string) error {
+	return s.repo.UpdatePaymentLink(ctx, orderID, link)
 }

@@ -28,10 +28,19 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 
 	err = ch.QueueBind(
 		q.Name,
+		rabbitmq.PaymentCreatedEvent,
+		rabbitmq.OrderExchange,
+		false,
+		nil,
+	)
+
+	err = ch.QueueBind(
+		q.Name,
 		rabbitmq.OrderPaidEvent,
 		rabbitmq.OrderExchange,
 		false,
-		nil)
+		nil,
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -51,27 +60,53 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 					return
 				}
 
-				var order events.OrderCreatedEvent
-				err := json.Unmarshal(d.Body, &order)
-				if err != nil {
-					log.Println(err)
-					d.Nack(false, false)
-					continue
-				}
+				switch d.RoutingKey {
 
-				err = c.service.UpdateOrder(ctx, order.OrderID, order.Status)
-				if err != nil {
-					log.Printf("Error creating payment link: %s", err)
+				case rabbitmq.PaymentCreatedEvent:
 
-					if err := rabbitmq.HandleRetry(ch, &d); err != nil {
-						log.Printf("Error handling retry: %s", err)
+					var event events.PaymentCreatedEvent
+					if err := json.Unmarshal(d.Body, &event); err != nil {
+						log.Println(err)
+						d.Nack(false, false)
+						continue
 					}
 
-					d.Nack(false, false)
-					continue
-				}
+					err := c.service.UpdatePaymentLink(ctx, event.OrderID, event.PaymentURL)
+					if err != nil {
+						log.Printf("UpdatePaymentLink error: %s", err)
 
-				log.Printf("Order updated")
+						if err := rabbitmq.HandleRetry(ch, &d); err != nil {
+							log.Printf("Retry error: %s", err)
+						}
+
+						d.Nack(false, false)
+						continue
+					}
+					log.Printf("Payment link updated for order %s", event.OrderID)
+
+				case rabbitmq.OrderPaidEvent:
+
+					var event events.OrderPaidEvent
+					if err := json.Unmarshal(d.Body, &event); err != nil {
+						log.Println(err)
+						d.Nack(false, false)
+						continue
+					}
+
+					err := c.service.UpdateOrder(ctx, event.OrderID, event.Status)
+					if err != nil {
+						log.Printf("UpdateStatus error: %s", err)
+
+						if err := rabbitmq.HandleRetry(ch, &d); err != nil {
+							log.Printf("Retry error: %s", err)
+						}
+
+						d.Nack(false, false)
+						continue
+					}
+
+					log.Printf("Order status updated for order %s", event.OrderID)
+				}
 				d.Ack(false)
 			}
 

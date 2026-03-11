@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"orders/internal/domain/models"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -139,6 +140,7 @@ func (r *postgresRepository) UpdateStatus(ctx context.Context, id string, status
 func (r *postgresRepository) UpdatePaymentLink(ctx context.Context, id string, link string) error {
 	const op = "orders.repository.UpdatePaymentLink"
 
+	log.Printf("UpdatePaymentLink: id=%s link=%s", id, link)
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE orders.orders SET payment_link = $2 WHERE id = $1`,
 		id, link,

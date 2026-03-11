@@ -54,7 +54,13 @@ func (s *paymentService) CreatePayment(ctx context.Context, orderID string, amou
 		return nil, err
 	}
 
-	body, err := json.Marshal(pay)
+	event := events.PaymentLinkCreatedEvent{
+		OrderID:     orderID,
+		PaymentLink: pay.Confirmation.ConfirmationURL,
+		Status:      pay.Status,
+	}
+
+	body, err := json.Marshal(event)
 	if err != nil {
 		return nil, err
 	}
@@ -64,6 +70,9 @@ func (s *paymentService) CreatePayment(ctx context.Context, orderID string, amou
 		ContentType:  "application/json",
 		Body:         body,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return pay, nil
 }

@@ -29,10 +29,6 @@ func NewGRPCHandler(grpcSrv *grpc.Server, service services.OrdersService, channe
 }
 
 func (h *serverAPI) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (*pb.Order, error) {
-	//q, err := h.channel.QueueDeclare(rabbitmq.OrderCreatedEvent, true, false, false, false, nil)
-	//if err != nil {
-	//	log.Printf("Failed to declare a queue: %s", err)
-	//}
 
 	items := make([]models.Item, len(req.Items))
 	for i, item := range req.Items {
