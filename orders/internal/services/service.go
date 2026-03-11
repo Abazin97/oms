@@ -2,15 +2,22 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"gateway/rabbitmq"
 	"orders/internal/domain/models"
+	"orders/internal/events"
 	"orders/internal/gateway"
 	"orders/internal/repository"
 	"time"
+
+	amqp "github.com/rabbitmq/amqp091-go"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type OrdersService interface {
-	CreateOrder(context.Context, string, string, time.Time, time.Time, []models.Item) (*models.Order, error)
+	CreateOrder(ctx context.Context, lotID string, customerID string, from time.Time, to time.Time, items []models.Item) (*models.Order, error)
 	GetOrder(context.Context, string) (models.Order, error)
 	UpdateOrder(ctx context.Context, id string, status string) error
 }
@@ -19,10 +26,11 @@ type ordersService struct {
 	repo    repository.Repository
 	stock   gateway.StockGateway
 	payment gateway.PaymentGateway
+	channel *amqp.Channel
 }
 
-func NewOrdersService(repo repository.Repository, stockService gateway.StockGateway, paymentService gateway.PaymentGateway) OrdersService {
-	return &ordersService{repo: repo, stock: stockService, payment: paymentService}
+func NewOrdersService(repo repository.Repository, stockService gateway.StockGateway, paymentService gateway.PaymentGateway, channel *amqp.Channel) OrdersService {
+	return &ordersService{repo: repo, stock: stockService, payment: paymentService, channel: channel}
 }
 
 func (s *ordersService) CreateOrder(ctx context.Context, lotID string, customerID string, from time.Time, to time.Time, products []models.Item) (*models.Order, error) {
@@ -38,20 +46,46 @@ func (s *ordersService) CreateOrder(ctx context.Context, lotID string, customerI
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	_, err = s.stock.Reserve(ctx, lotID, orderID, from, to)
+	event := events.OrderCreatedEvent{
+		OrderID:    orderID,
+		LotID:      lotID,
+		CustomerID: customerID,
+		From:       from,
+		To:         to,
+		Items:      products,
+	}
 
-	// todo: replace hardcode strings w/ special calculation method
-	pay, err := s.payment.CreatePayment(ctx, orderID, "2", "RUB")
+	body, err := json.Marshal(event)
 	if err != nil {
-		// todo: releasing reservation in case of payment failure
-		//s.stock.Release(ctx, reservationID)
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	err = s.repo.UpdatePaymentLink(ctx, orderID, pay.Confirmation.ConfirmationURL)
+	err = s.channel.PublishWithContext(ctx, rabbitmq.OrderExchange, rabbitmq.OrderCreatedEvent, false, false, amqp.Publishing{
+		DeliveryMode: amqp.Persistent,
+		ContentType:  "application/json",
+		Body:         body,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
+		return nil, status.Error(codes.Internal, "Failed to publish order event")
 	}
+
+	//_, err = s.stock.Reserve(ctx, lotID, orderID, from, to)
+	//if err != nil {
+	//	return nil, fmt.Errorf("%s: %w", op, err)
+	//}
+	//
+	//// todo: replace hardcode strings w/ special calculation method
+	//pay, err := s.payment.CreatePayment(ctx, orderID, "2", "RUB")
+	//if err != nil {
+	//	// todo: releasing reservation in case of payment failure
+	//	//s.stock.Release(ctx, reservationID)
+	//	return nil, fmt.Errorf("%s: %w", op, err)
+	//}
+	//
+	//err = s.repo.UpdatePaymentLink(ctx, orderID, pay.Confirmation.ConfirmationURL)
+	//if err != nil {
+	//	return nil, fmt.Errorf("%s: %w", op, err)
+	//}
 
 	o, err := s.repo.Get(ctx, orderID)
 	if err != nil {

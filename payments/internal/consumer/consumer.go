@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"gateway/rabbitmq"
 	"log"
-	"payments/internal/domain/models"
+	"payments/internal/events"
 	"payments/internal/services"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -23,15 +23,15 @@ func NewConsumer(service services.PaymentService) *Consumer {
 
 func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 	q, err := ch.QueueDeclare(
-		"", true, false, true, false, nil)
+		"payments.order-created.queue", true, false, true, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	err = ch.QueueBind(
 		q.Name,
-		"",
-		rabbitmq.OrderPaidEvent,
+		rabbitmq.OrderCreatedEvent,
+		rabbitmq.OrderExchange,
 		false,
 		nil)
 	if err != nil {
@@ -53,18 +53,16 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 					return
 				}
 
-				var p models.OrderPaidEvent
+				var p events.OrderCreatedEvent
 				if err := json.Unmarshal(d.Body, &p); err != nil {
 					log.Printf("Failed to unmarshal payload: %s", err)
 					d.Nack(false, false)
 					continue
 				}
+				log.Println("event body:", string(d.Body))
 
-				orderID := p.OrderID
-				amount := p.Amount
-				currency := p.Currency
-
-				paymentLink, err := c.service.CreatePayment(ctx, orderID, amount, currency)
+				// todo: remove hardcode strings
+				payment, err := c.service.CreatePayment(ctx, p.OrderID, "2", "RUB")
 				if err != nil {
 					log.Printf("Error creating payment link: %s", err)
 
@@ -72,11 +70,10 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 						log.Printf("Error handling retry: %s", err)
 					}
 
-					d.Nack(false, false)
-					continue
+					d.Nack(false, true)
 				}
 
-				log.Printf("Payment link created %s", paymentLink)
+				log.Printf("Payment link created %s", payment.Confirmation.ConfirmationURL)
 				d.Ack(false)
 
 			case <-ctx.Done():

@@ -27,9 +27,26 @@ func (h *serverAPI) CreatePayment(ctx context.Context, req *pb.CreatePaymentRequ
 		return nil, status.Errorf(codes.Internal, "yookassa error: %v", err)
 	}
 
-	return &pb.CreatePaymentResponse{
+	payment := &pb.CreatePaymentResponse{
 		PaymentId:  resp.ID,
 		PaymentUrl: resp.Confirmation.ConfirmationURL,
 		Status:     resp.Status,
-	}, nil
+	}
+
+	//body, err := json.Marshal(resp)
+	//if err != nil {
+	//	return nil, status.Error(codes.Internal, "Failed to marshal order")
+	//}
+	//
+	//err = h.channel.PublishWithContext(ctx, rabbitmq.OrderExchange, rabbitmq.OrderPaidEvent, false, false, amqp.Publishing{
+	//	DeliveryMode: amqp.Persistent,
+	//	ContentType:  "application/json",
+	//	Body:         body,
+	//})
+	//if err != nil {
+	//	return nil, status.Error(codes.Internal, "Failed to publish payment event")
+	//}
+
+	return payment, nil
+
 }

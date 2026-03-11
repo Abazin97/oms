@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"gateway/rabbitmq"
 	"io"
 	"log"
 	"net/http"
@@ -58,42 +57,38 @@ func (h *paymentHandler) HandleYouKassaWebHook(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if notification.Object.Status == "succeeded" {
-		orderID := notification.Object.Metadata["orderId"]
-		amount := notification.Object.Amount.Value
-		currency := notification.Object.Amount.Currency
-
-		o := map[string]string{
-			"orderID":  orderID,
-			"amount":   amount,
-			"currency": currency,
-			"status":   "paid",
-		}
-
-		body, err := json.Marshal(o)
-		if err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-
-		err = h.channel.PublishWithContext(
-			r.Context(),
-			rabbitmq.OrderPaidEvent,
-			"",
-			false,
-			false,
-			amqp.Publishing{
-				ContentType:  "application/json",
-				Body:         body,
-				DeliveryMode: amqp.Persistent,
-			})
-		if err != nil {
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-
-		log.Println("message published: order.paid", orderID)
-	}
+	//if notification.Object.Status == "succeeded" {
+	//	event := models.OrderPaidEvent{
+	//		OrderID:  notification.Object.Metadata["orderId"],
+	//		Amount:   notification.Object.Amount.Value,
+	//		Currency: notification.Object.Amount.Currency,
+	//		Status:   "paid",
+	//	}
+	//
+	//	resp, err := json.Marshal(event)
+	//	if err != nil {
+	//		http.Error(w, "internal error", http.StatusInternalServerError)
+	//		return
+	//	}
+	//
+	//	err = h.channel.PublishWithContext(
+	//		r.Context(),
+	//		rabbitmq.OrderExchange,
+	//		rabbitmq.OrderPaidEvent,
+	//		false,
+	//		false,
+	//		amqp.Publishing{
+	//			ContentType:  "application/json",
+	//			Body:         resp,
+	//			DeliveryMode: amqp.Persistent,
+	//		})
+	//	if err != nil {
+	//		http.Error(w, "internal error", http.StatusInternalServerError)
+	//		return
+	//	}
+	//
+	//	log.Println("message published: order.paid", event.OrderID)
+	//}
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok"}`))

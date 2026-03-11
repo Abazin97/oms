@@ -2,9 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
-	"gateway/rabbitmq"
-	"log"
 	"orders/internal/domain/models"
 	"orders/internal/services"
 
@@ -32,10 +29,10 @@ func NewGRPCHandler(grpcSrv *grpc.Server, service services.OrdersService, channe
 }
 
 func (h *serverAPI) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest) (*pb.Order, error) {
-	q, err := h.channel.QueueDeclare(rabbitmq.OrderCreatedEvent, true, false, false, false, nil)
-	if err != nil {
-		log.Printf("Failed to declare a queue: %s", err)
-	}
+	//q, err := h.channel.QueueDeclare(rabbitmq.OrderCreatedEvent, true, false, false, false, nil)
+	//if err != nil {
+	//	log.Printf("Failed to declare a queue: %s", err)
+	//}
 
 	items := make([]models.Item, len(req.Items))
 	for i, item := range req.Items {
@@ -71,19 +68,19 @@ func (h *serverAPI) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest)
 		PaymentLink: createdOrder.PaymentLink,
 	}
 
-	body, err := json.Marshal(order)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "Failed to marshal order")
-	}
-
-	err = h.channel.PublishWithContext(ctx, "", q.Name, false, false, amqp.Publishing{
-		DeliveryMode: amqp.Persistent,
-		ContentType:  "application/json",
-		Body:         body,
-	})
-	if err != nil {
-		return nil, status.Error(codes.Internal, "Failed to publish order")
-	}
+	//body, err := json.Marshal(order)
+	//if err != nil {
+	//	return nil, status.Error(codes.Internal, "Failed to marshal order")
+	//}
+	//
+	//err = h.channel.PublishWithContext(ctx, rabbitmq.OrderExchange, rabbitmq.OrderCreatedEvent, false, false, amqp.Publishing{
+	//	DeliveryMode: amqp.Persistent,
+	//	ContentType:  "application/json",
+	//	Body:         body,
+	//})
+	//if err != nil {
+	//	return nil, status.Error(codes.Internal, "Failed to publish order event")
+	//}
 
 	return order, nil
 }

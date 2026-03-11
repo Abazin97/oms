@@ -89,11 +89,11 @@ func main() {
 	reservationRepo := repository.NewSpotReservationRepository(db)
 
 	txManager := tx.NewTxManager(db)
-	stockService := services.NewStockService(txManager, parkingRepo, reservationRepo)
-	handlers.NewGRPCHandler(grpcSrv, stockService, ch)
+	stockService := services.NewStockService(txManager, parkingRepo, reservationRepo, ch)
+	handlers.NewGRPCHandler(grpcSrv, stockService)
 
-	c := consumer.NewConsumer()
-	go c.Listen(ch)
+	c := consumer.NewConsumer(stockService)
+	go c.Listen(ctx, ch)
 
 	l, err := net.Listen("tcp", grpcAddr)
 	if err != nil {

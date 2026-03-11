@@ -91,7 +91,7 @@ func main() {
 
 	paymentGateway := gateway.NewPaymentGateway(registry)
 
-	ordersService := services.NewOrdersService(repo, stockGateway, paymentGateway)
+	ordersService := services.NewOrdersService(repo, stockGateway, paymentGateway, ch)
 	handlers.NewGRPCHandler(grpcSrv, ordersService, ch)
 
 	c := consumer.NewConsumer(ordersService)

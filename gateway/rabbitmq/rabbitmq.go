@@ -10,9 +10,17 @@ import (
 )
 
 const (
-	OrderCreatedEvent = "order.created"
-	OrderPaidEvent    = "order.paid"
-	MaxRetryCount     = 3
+	OrderExchange = "order.exchange"
+
+	OrderCreatedEvent       = "orders.created"
+	PaymentCreatedEvent     = "payments.created"
+	OrderPaymentLinkEvent   = "orders.payment_link_created"
+	OrderPaidEvent          = "orders.paid"
+	OrderCanceledEvent      = "orders.canceled"
+	StockReservedEvent      = "stock.reserved"
+	StockStatusChangedEvent = "stock.status_changed"
+
+	MaxRetryCount = 3
 )
 
 func Connect(user, pass, host string, port string) (*amqp.Channel, func() error) {
@@ -28,15 +36,15 @@ func Connect(user, pass, host string, port string) (*amqp.Channel, func() error)
 		log.Fatal(err)
 	}
 
-	err = ch.ExchangeDeclare(OrderCreatedEvent, "direct", true, false, false, false, nil)
+	err = ch.ExchangeDeclare(OrderExchange, "topic", true, false, false, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = ch.ExchangeDeclare(OrderPaidEvent, "fanout", true, false, false, false, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	//err = ch.ExchangeDeclare(OrderPaidEvent, "fanout", true, false, false, false, nil)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 
 	return ch, conn.Close
 }
@@ -62,7 +70,7 @@ func HandleRetry(ch *amqp.Channel, d *amqp.Delivery) error {
 
 	return ch.PublishWithContext(
 		context.Background(),
-		d.Exchange,
+		OrderExchange,
 		d.RoutingKey,
 		false,
 		false,

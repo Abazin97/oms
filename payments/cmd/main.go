@@ -81,7 +81,7 @@ func main() {
 
 	yooClient := yookassa.NewClient()
 
-	paymentService := services.NewPaymentService(ordersGateway, yooClient)
+	paymentService := services.NewPaymentService(ordersGateway, yooClient, ch)
 	handlers.NewGRPCHandler(grpcSrv, paymentService)
 
 	c := consumer.NewConsumer(paymentService)

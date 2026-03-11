@@ -6,7 +6,6 @@ import (
 
 	pb "github.com/Abazin97/common/gen/go/stock"
 	"github.com/google/uuid"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -16,17 +15,15 @@ import (
 type serverAPI struct {
 	pb.UnimplementedStockServiceServer
 	service services.StockService
-	channel *amqp.Channel
 }
 
-func NewGRPCHandler(grpcSrv *grpc.Server, service services.StockService, channel *amqp.Channel) {
+func NewGRPCHandler(grpcSrv *grpc.Server, service services.StockService) {
 	if service == nil {
 		panic("service is nil")
 	}
 
 	handler := &serverAPI{
 		service: service,
-		channel: channel,
 	}
 	pb.RegisterStockServiceServer(grpcSrv, handler)
 }

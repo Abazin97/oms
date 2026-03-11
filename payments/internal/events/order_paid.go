@@ -1,8 +1,8 @@
-package models
+package events
 
 type OrderPaidEvent struct {
+	OrderID  string `json:"order_id"`
 	Amount   string `json:"amount"`
 	Currency string `json:"currency"`
-	OrderID  string `json:"orderID"`
 	Status   string `json:"status"`
 }

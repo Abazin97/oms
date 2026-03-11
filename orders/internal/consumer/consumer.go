@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"gateway/rabbitmq"
 	"log"
-	"orders/internal/domain/models"
+	"orders/internal/events"
 	"orders/internal/services"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -21,15 +21,15 @@ func NewConsumer(service services.OrdersService) *Consumer {
 
 func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 	q, err := ch.QueueDeclare(
-		"", true, false, true, false, nil)
+		"orders.order.queue", true, false, true, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	err = ch.QueueBind(
 		q.Name,
-		"",
 		rabbitmq.OrderPaidEvent,
+		rabbitmq.OrderExchange,
 		false,
 		nil)
 	if err != nil {
@@ -51,7 +51,7 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 					return
 				}
 
-				var order models.Order
+				var order events.OrderCreatedEvent
 				err := json.Unmarshal(d.Body, &order)
 				if err != nil {
 					log.Println(err)
@@ -59,7 +59,7 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 					continue
 				}
 
-				err = c.service.UpdateOrder(ctx, order.Id, order.Status)
+				err = c.service.UpdateOrder(ctx, order.OrderID, order.Status)
 				if err != nil {
 					log.Printf("Error creating payment link: %s", err)
 
