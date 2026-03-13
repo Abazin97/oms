@@ -21,7 +21,7 @@ func NewConsumer(service services.OrdersService) *Consumer {
 
 func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 	q, err := ch.QueueDeclare(
-		"orders.order.queue", true, false, true, false, nil)
+		"orders.order.queue", true, false, false, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,6 +41,9 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 		false,
 		nil,
 	)
+
+	err = ch.QueueBind(q.Name, rabbitmq.StockReservedEvent, rabbitmq.OrderExchange, false, nil)
+	err = ch.QueueBind(q.Name, rabbitmq.StockReservationFailedEvent, rabbitmq.OrderExchange, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,6 +64,33 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 				}
 
 				switch d.RoutingKey {
+
+				case rabbitmq.StockReservedEvent:
+					var event events.StockReservedEvent
+
+					err := json.Unmarshal(d.Body, &event)
+					if err != nil {
+						log.Println(err)
+					}
+
+					log.Printf("Spot reserved for order: %s", event.OrderID)
+
+				case rabbitmq.StockReservationFailedEvent:
+
+					var event events.StockReservationFailedEvent
+
+					err := json.Unmarshal(d.Body, &event)
+					if err != nil {
+						log.Println(err)
+					}
+
+					err = c.service.UpdateOrder(ctx, event.OrderID, "cancelled")
+					if err != nil {
+						d.Nack(false, true)
+						continue
+					}
+
+					log.Printf("Stock reservation failed for order: %s", event.OrderID)
 
 				case rabbitmq.PaymentCreatedEvent:
 

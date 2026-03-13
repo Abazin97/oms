@@ -23,7 +23,7 @@ func NewConsumer(service services.PaymentService) *Consumer {
 
 func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 	q, err := ch.QueueDeclare(
-		"payments.order-created.queue", true, false, true, false, nil)
+		"payments.order-created.queue", true, false, false, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

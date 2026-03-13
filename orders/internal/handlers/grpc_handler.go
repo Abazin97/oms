@@ -64,20 +64,6 @@ func (h *serverAPI) CreateOrder(ctx context.Context, req *pb.CreateOrderRequest)
 		PaymentLink: createdOrder.PaymentLink,
 	}
 
-	//body, err := json.Marshal(order)
-	//if err != nil {
-	//	return nil, status.Error(codes.Internal, "Failed to marshal order")
-	//}
-	//
-	//err = h.channel.PublishWithContext(ctx, rabbitmq.OrderExchange, rabbitmq.OrderCreatedEvent, false, false, amqp.Publishing{
-	//	DeliveryMode: amqp.Persistent,
-	//	ContentType:  "application/json",
-	//	Body:         body,
-	//})
-	//if err != nil {
-	//	return nil, status.Error(codes.Internal, "Failed to publish order event")
-	//}
-
 	return order, nil
 }
 

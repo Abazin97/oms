@@ -11,6 +11,7 @@ import (
 	"stock/internal/events"
 	"stock/internal/repository"
 	"stock/internal/tx"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -57,6 +58,28 @@ func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string
 
 	spotID, err := s.spotReservationRepo.Get(ctx, lotUUID, from, to)
 	if err != nil {
+		if strings.Contains(err.Error(), "no free spots") {
+			event := events.StockReservationFailedEvent{
+				OrderID: orderID,
+				Reason:  err.Error(),
+			}
+
+			body, err := json.Marshal(event)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", op, err)
+			}
+
+			err = s.channel.PublishWithContext(ctx, rabbitmq.OrderExchange, rabbitmq.StockReservationFailedEvent, false, false, amqp.Publishing{
+				DeliveryMode: amqp.Persistent,
+				ContentType:  "application/json",
+				Body:         body,
+			})
+
+			log.Printf("%s: no free spot for order %s", op, orderID)
+
+			return nil, err
+		}
+
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 

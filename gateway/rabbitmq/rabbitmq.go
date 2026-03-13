@@ -12,13 +12,13 @@ import (
 const (
 	OrderExchange = "order.exchange"
 
-	OrderCreatedEvent       = "orders.created"
-	PaymentCreatedEvent     = "payments.created"
-	OrderPaymentLinkEvent   = "orders.payment_link_created"
-	OrderPaidEvent          = "orders.paid"
-	OrderCanceledEvent      = "orders.canceled"
-	StockReservedEvent      = "stock.reserved"
-	StockStatusChangedEvent = "stock.status_changed"
+	OrderCreatedEvent           = "orders.created"
+	PaymentCreatedEvent         = "payments.created"
+	OrderPaidEvent              = "orders.paid"
+	OrderCanceledEvent          = "orders.canceled"
+	StockReservedEvent          = "stock.reserved"
+	StockStatusChangedEvent     = "stock.status_changed"
+	StockReservationFailedEvent = "stock.reservation_failed"
 
 	MaxRetryCount = 3
 )
@@ -40,11 +40,6 @@ func Connect(user, pass, host string, port string) (*amqp.Channel, func() error)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	//err = ch.ExchangeDeclare(OrderPaidEvent, "fanout", true, false, false, false, nil)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
 
 	return ch, conn.Close
 }

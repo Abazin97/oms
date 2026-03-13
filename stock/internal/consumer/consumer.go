@@ -23,7 +23,7 @@ func NewConsumer(service services.StockService) *Consumer {
 
 func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 	q, err := ch.QueueDeclare(
-		"orders.stock.queue", true, false, true, false, nil)
+		"orders.stock.queue", true, false, false, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
