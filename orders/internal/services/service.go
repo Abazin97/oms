@@ -9,6 +9,7 @@ import (
 	"orders/internal/events"
 	"orders/internal/gateway"
 	"orders/internal/repository"
+	"orders/tx"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -24,24 +25,35 @@ type OrdersService interface {
 }
 
 type ordersService struct {
+	tx      tx.TxManager
 	repo    repository.Repository
 	stock   gateway.StockGateway
 	payment gateway.PaymentGateway
 	channel *amqp.Channel
 }
 
-func NewOrdersService(repo repository.Repository, stockService gateway.StockGateway, paymentService gateway.PaymentGateway, channel *amqp.Channel) OrdersService {
-	return &ordersService{repo: repo, stock: stockService, payment: paymentService, channel: channel}
+func NewOrdersService(tx tx.TxManager, repo repository.Repository, stockService gateway.StockGateway, paymentService gateway.PaymentGateway, channel *amqp.Channel) OrdersService {
+	return &ordersService{tx: tx, repo: repo, stock: stockService, payment: paymentService, channel: channel}
 }
 
 func (s *ordersService) CreateOrder(ctx context.Context, lotID string, customerID string, from time.Time, to time.Time, products []models.Item) (*models.Order, error) {
 	const op = "order.services.CreateOrder"
 
-	orderID, err := s.repo.Create(ctx, models.Order{
-		CustomerId:  customerID,
-		Items:       products,
-		Status:      "pending",
-		PaymentLink: "",
+	var orderID string
+
+	err := s.tx.WithTx(ctx, func(tx tx.Tx) error {
+		id, err := s.repo.Create(ctx, tx, models.Order{
+			CustomerId:  customerID,
+			Items:       products,
+			Status:      "pending",
+			PaymentLink: "",
+		})
+		if err != nil {
+			return err
+		}
+
+		orderID = id
+		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
@@ -111,8 +123,15 @@ func (s *ordersService) GetOrder(ctx context.Context, id string) (models.Order, 
 func (s *ordersService) UpdateOrder(ctx context.Context, id string, status string) error {
 	const op = "order.services.UpdateOrder"
 
-	if err := s.repo.UpdateStatus(ctx, id, status); err != nil {
-		return fmt.Errorf("%s: %w", op, err)
+	err := s.tx.WithTx(ctx, func(tx tx.Tx) error {
+		if err := s.repo.UpdateStatus(ctx, id, status); err != nil {
+			return fmt.Errorf("%s: %w", op, err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil

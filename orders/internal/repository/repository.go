@@ -5,12 +5,13 @@ import (
 	"database/sql"
 	"fmt"
 	"orders/internal/domain/models"
+	"orders/tx"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type Repository interface {
-	Create(context.Context, models.Order) (string, error)
+	Create(context.Context, tx.Tx, models.Order) (string, error)
 	Get(context.Context, string) (models.Order, error)
 	UpdateStatus(ctx context.Context, id string, status string) error
 	UpdatePaymentLink(ctx context.Context, id string, link string) error
@@ -35,6 +36,20 @@ func NewPostgresRepository(url string) (Repository, error) {
 	return &postgresRepository{db: db}, nil
 }
 
+func NewPostgresDB(url string) (*sql.DB, error) {
+	db, err := sql.Open("pgx", url)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Ping()
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
 func (r *postgresRepository) Close() error {
 	return r.db.Close()
 }
@@ -43,36 +58,46 @@ func (r *postgresRepository) Ping() error {
 	return r.db.Ping()
 }
 
-func (r *postgresRepository) Create(ctx context.Context, o models.Order) (string, error) {
+func (r *postgresRepository) Create(ctx context.Context, tx tx.Tx, o models.Order) (string, error) {
 	const op = "orders.repository.Create"
-
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return "", err
-	}
-	defer tx.Rollback()
 
 	var id string
 
-	err = tx.QueryRowContext(ctx, `INSERT INTO orders.orders (status, customer_id, payment_link) values ($1, $2, $3) RETURNING id`,
-		o.Status, o.CustomerId, o.PaymentLink).Scan(&id)
+	err := tx.QueryRowContext(
+		ctx,
+		`INSERT INTO orders.orders (status, customer_id, payment_link)
+		 VALUES ($1, $2, $3) RETURNING id`,
+		o.Status,
+		o.CustomerId,
+		o.PaymentLink,
+	).Scan(&id)
+
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
 
-	stmt, err := tx.PrepareContext(ctx, `INSERT INTO orders.order_items (order_id, product_id, name, quantity, price) values ($1, $2, $3, $4, $5)`)
+	stmt, err := tx.PrepareContext(
+		ctx,
+		`INSERT INTO orders.order_items (order_id, product_id, name, quantity, price)
+		 VALUES ($1, $2, $3, $4, $5)`,
+	)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", op, err)
 	}
 	defer stmt.Close()
 
 	for _, item := range o.Items {
-		if _, err = stmt.ExecContext(ctx, id, item.Id, item.Name, item.Quantity, item.Price); err != nil {
+		_, err = stmt.ExecContext(
+			ctx,
+			id,
+			item.Id,
+			item.Name,
+			item.Quantity,
+			item.Price,
+		)
+		if err != nil {
 			return "", fmt.Errorf("%s: %w", op, err)
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		return "", fmt.Errorf("%s: %w", op, err)
 	}
 
 	return id, nil

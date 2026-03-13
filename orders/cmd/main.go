@@ -13,6 +13,7 @@ import (
 	"orders/internal/handlers"
 	"orders/internal/repository"
 	"orders/internal/services"
+	"orders/tx"
 	"os"
 	"os/signal"
 	"syscall"
@@ -80,6 +81,13 @@ func main() {
 
 	grpcSrv := grpc.NewServer()
 
+	db, err := repository.NewPostgresDB(url)
+	if err != nil {
+		log.Error("Error connecting to database")
+		os.Exit(1)
+	}
+	defer db.Close()
+
 	repo, err := repository.NewPostgresRepository(url)
 	if err != nil {
 		log.Error("failed to connect to postgres repository: ", err)
@@ -91,7 +99,8 @@ func main() {
 
 	paymentGateway := gateway.NewPaymentGateway(registry)
 
-	ordersService := services.NewOrdersService(repo, stockGateway, paymentGateway, ch)
+	txManager := tx.NewTxManager(db)
+	ordersService := services.NewOrdersService(txManager, repo, stockGateway, paymentGateway, ch)
 	handlers.NewGRPCHandler(grpcSrv, ordersService, ch)
 
 	c := consumer.NewConsumer(ordersService)
