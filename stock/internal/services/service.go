@@ -21,9 +21,11 @@ import (
 var ErrNotEnoughSpots = errors.New("not enough spots")
 
 type StockService interface {
+	StartReservationCleaner(ctx context.Context)
 	Reserve(ctx context.Context, lotID string, orderID string, from time.Time, to time.Time) (*models.Reservation, error)
 	ChangeStatus(ctx context.Context, reservationID uuid.UUID, status string) error
 	GetAvailability(ctx context.Context, lotID uuid.UUID, from time.Time, to time.Time) (bool, error)
+	Release(ctx context.Context, reservationID uuid.UUID) error
 }
 
 type stockService struct {
@@ -35,6 +37,36 @@ type stockService struct {
 
 func NewStockService(tx tx.TxManager, spotRepository repository.ParkingSpot, reservationRepository repository.SpotReservation, channel *amqp.Channel) StockService {
 	return &stockService{tx: tx, parkingSpotRepo: spotRepository, spotReservationRepo: reservationRepository, channel: channel}
+}
+
+func (s *stockService) StartReservationCleaner(ctx context.Context) {
+
+	ticker := time.NewTicker(1 * time.Minute)
+
+	go func() {
+		for {
+			select {
+
+			case <-ticker.C:
+
+				reservations, err := s.spotReservationRepo.GetExpired(ctx)
+				if err != nil {
+					log.Println("reservation cleaner error:", err)
+					continue
+				}
+
+				for _, r := range reservations {
+					err := s.Release(ctx, r.ID)
+					if err != nil {
+						log.Println("release failed:", err)
+					}
+				}
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func (s *stockService) GetAvailability(ctx context.Context, lotID uuid.UUID, from time.Time, to time.Time) (bool, error) {
@@ -178,6 +210,50 @@ func (s *stockService) ChangeStatus(ctx context.Context, reservationID uuid.UUID
 	} else {
 		log.Printf("%s: changed %s", op, reservationID)
 	}
+
+	return nil
+}
+
+func (s *stockService) Release(
+	ctx context.Context,
+	reservationID uuid.UUID,
+) error {
+
+	const op = "stock.services.Release"
+
+	err := s.tx.WithTx(ctx, func(tx tx.Tx) error {
+		return s.spotReservationRepo.Update(ctx, tx, reservationID, "released")
+	})
+
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	event := events.StockReleasedEvent{
+		ReservationID: reservationID.String(),
+		Reason:        "released",
+	}
+
+	body, _ := json.Marshal(event)
+
+	err = s.channel.PublishWithContext(
+		ctx,
+		rabbitmq.OrderExchange,
+		rabbitmq.StockReleasedEvent,
+		false,
+		false,
+		amqp.Publishing{
+			DeliveryMode: amqp.Persistent,
+			ContentType:  "application/json",
+			Body:         body,
+		},
+	)
+
+	if err != nil {
+		return fmt.Errorf("%s: publish failed: %w", op, err)
+	}
+
+	log.Printf("reservation released %s", reservationID)
 
 	return nil
 }

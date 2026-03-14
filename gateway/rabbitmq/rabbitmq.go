@@ -19,6 +19,7 @@ const (
 	StockReservedEvent          = "stock.reserved"
 	StockStatusChangedEvent     = "stock.status_changed"
 	StockReservationFailedEvent = "stock.reservation_failed"
+	StockReleasedEvent          = "stock.released"
 
 	MaxRetryCount = 3
 )

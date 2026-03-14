@@ -25,6 +25,7 @@ type SpotReservation interface {
 	Create(ctx context.Context, tx tx.Tx, r *models.Reservation) error
 	Get(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (string, error)
 	Update(ctx context.Context, tx tx.Tx, reservationID uuid.UUID, status string) error
+	GetExpired(ctx context.Context) ([]models.Reservation, error)
 }
 
 type ParkingSpotRepository struct {
@@ -151,22 +152,31 @@ func (r *SpotReservationRepository) Update(ctx context.Context, tx tx.Tx, reserv
 	return nil
 }
 
-//func (r *ParkingPlacesRepository) Lock(ctx context.Context, tx services.Tx, id uuid.UUID) (*models.ParkingPlaces, error) {
-//	const op = "stock.repository.Lock"
-//
-//	row := tx.QueryRowContext(ctx,
-//		`SELECT id, total_spots, available_spots FROM stock.parking_lots
-//				WHERE id = $1
-//				FOR UPDATE `, id)
-//
-//	var lot models.ParkingPlaces
-//	if err := row.Scan(&lot.ID, &lot.TotalSpots, &lot.AvailableSpots); err != nil {
-//		if errors.Is(err, sql.ErrNoRows) {
-//			return &models.ParkingPlaces{}, fmt.Errorf("%s %w", op, ErrParkingNotFound)
-//		}
-//		return &models.ParkingPlaces{}, fmt.Errorf("%s %w", op, err)
-//	}
-//
-//	return &lot, nil
-//}
-//
+func (r *SpotReservationRepository) GetExpired(ctx context.Context) ([]models.Reservation, error) {
+	const op = "stock.repository.GetExpired"
+
+	rows, err := r.db.QueryContext(ctx, `
+	SELECT id, order_id, parking_spot_id, starts_at, ends_at
+	FROM stock.spot_reservations
+	WHERE status = 'pending'
+	AND expires_at < NOW()
+	`)
+	if err != nil {
+		return []models.Reservation{}, fmt.Errorf("%s %w", op, err)
+	}
+	defer rows.Close()
+
+	var reservations []models.Reservation
+	for rows.Next() {
+		var reserv models.Reservation
+
+		err := rows.Scan(reserv.ID, reserv.OrderID, reserv.ParkingSpotID, reserv.StartsAt, reserv.EndsAt)
+		if err != nil {
+			return []models.Reservation{}, fmt.Errorf("%s %w", op, err)
+		}
+
+		reservations = append(reservations, reserv)
+	}
+
+	return reservations, nil
+}
