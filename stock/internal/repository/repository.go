@@ -15,6 +15,7 @@ import (
 
 var (
 	ErrReservationNotFound = errors.New("reservation not found")
+	ErrNoFreeSpots         = errors.New("no free spots")
 )
 
 type ParkingSpot interface {
@@ -22,9 +23,10 @@ type ParkingSpot interface {
 }
 
 type SpotReservation interface {
-	Create(ctx context.Context, tx tx.Tx, r *models.Reservation) error
-	Get(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (string, error)
-	Update(ctx context.Context, tx tx.Tx, reservationID uuid.UUID, status string) error
+	Create(ctx context.Context, tx tx.Tx, r *models.Reservation) (string, error)
+	GetSpot(ctx context.Context, id uuid.UUID, from time.Time, to time.Time) (string, error)
+	GetReservation(ctx context.Context, id uuid.UUID) (string, error)
+	Update(ctx context.Context, tx tx.Tx, reservationID string, status string) error
 	GetExpired(ctx context.Context) ([]models.Reservation, error)
 }
 
@@ -85,7 +87,7 @@ func (r *ParkingSpotRepository) Get(ctx context.Context, id uuid.UUID, from time
 	return exists, nil
 }
 
-func (r *SpotReservationRepository) Get(ctx context.Context, lotID uuid.UUID, from, to time.Time) (string, error) {
+func (r *SpotReservationRepository) GetSpot(ctx context.Context, lotID uuid.UUID, from, to time.Time) (string, error) {
 	const op = "stock.repository.Get"
 
 	query := `
@@ -96,7 +98,7 @@ func (r *SpotReservationRepository) Get(ctx context.Context, lotID uuid.UUID, fr
 		SELECT 1
 		FROM stock.spot_reservations sr
 		WHERE sr.parking_spot_id = ps.id
-		AND sr.status IN ('pending', 'confirmed')
+		AND sr.status IN ('pending', 'paid')
 		AND (sr.ends_at <= $2 OR sr.starts_at >= $3)
 	)
 	LIMIT 1;`
@@ -105,7 +107,7 @@ func (r *SpotReservationRepository) Get(ctx context.Context, lotID uuid.UUID, fr
 	err := r.db.QueryRowContext(ctx, query, lotID, from, to).Scan(&spotID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", fmt.Errorf("%s no free spots", op)
+			return "", ErrNoFreeSpots
 		}
 		return "", fmt.Errorf("%s %w", op, err)
 	}
@@ -113,22 +115,24 @@ func (r *SpotReservationRepository) Get(ctx context.Context, lotID uuid.UUID, fr
 	return spotID, nil
 }
 
-func (r *SpotReservationRepository) Create(ctx context.Context, tx tx.Tx, res *models.Reservation) error {
+func (r *SpotReservationRepository) Create(ctx context.Context, tx tx.Tx, res *models.Reservation) (string, error) {
 	const op = "stock.repository.Create"
 
-	_, err := tx.ExecContext(ctx,
+	var id string
+	err := tx.QueryRowContext(ctx,
 		`INSERT INTO stock.spot_reservations (order_id, expires_at, created_at, parking_spot_id, starts_at, ends_at, status)
-				VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		res.OrderID, res.ExpiresAt, res.CreatedAt, res.ParkingSpotID, res.StartsAt, res.EndsAt, res.Status)
+				VALUES ($1, $2, $3, $4, $5, $6, $7)
+				RETURNING id`,
+		res.OrderID, res.ExpiresAt, res.CreatedAt, res.ParkingSpotID, res.StartsAt, res.EndsAt, res.Status).Scan(&id)
 
 	if err != nil {
-		return fmt.Errorf("%s %w", op, err)
+		return "", fmt.Errorf("%s %w", op, err)
 	}
 
-	return nil
+	return id, nil
 }
 
-func (r *SpotReservationRepository) Update(ctx context.Context, tx tx.Tx, reservationID uuid.UUID, status string) error {
+func (r *SpotReservationRepository) Update(ctx context.Context, tx tx.Tx, reservationID string, status string) error {
 	const op = "stock.repository.Update"
 
 	res, err := tx.ExecContext(ctx,
@@ -159,7 +163,7 @@ func (r *SpotReservationRepository) GetExpired(ctx context.Context) ([]models.Re
 	SELECT id, order_id, parking_spot_id, starts_at, ends_at
 	FROM stock.spot_reservations
 	WHERE status = 'pending'
-	AND expires_at < NOW()
+	AND created_at < NOW() - INTERVAL '2 minutes'
 	`)
 	if err != nil {
 		return []models.Reservation{}, fmt.Errorf("%s %w", op, err)
@@ -179,4 +183,21 @@ func (r *SpotReservationRepository) GetExpired(ctx context.Context) ([]models.Re
 	}
 
 	return reservations, nil
+}
+
+func (r *SpotReservationRepository) GetReservation(ctx context.Context, orderID uuid.UUID) (string, error) {
+	const op = "stock.repository.GetReservation"
+
+	var reservationID string
+	err := r.db.QueryRowContext(ctx,
+		`SELECT sr.id FROM stock.spot_reservations sr
+				WHERE sr.order_id = $1`, orderID).Scan(&reservationID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", fmt.Errorf("%s reservation not found", op)
+		}
+		return "", fmt.Errorf("%s %w", op, err)
+	}
+
+	return reservationID, nil
 }

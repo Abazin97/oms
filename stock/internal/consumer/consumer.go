@@ -34,6 +34,12 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 		rabbitmq.OrderExchange,
 		false,
 		nil)
+	err = ch.QueueBind(
+		q.Name,
+		rabbitmq.OrderPaidEvent,
+		rabbitmq.OrderExchange,
+		false,
+		nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -53,33 +59,64 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 					return
 				}
 
-				var order events.OrderCreatedEvent
+				switch d.RoutingKey {
 
-				err := json.Unmarshal(d.Body, &order)
-				if err != nil {
-					log.Println(err)
-					//d.Nack(false, false)
-					//continue
+				case rabbitmq.OrderCreatedEvent:
+
+					var event events.OrderCreatedEvent
+
+					err := json.Unmarshal(d.Body, &event)
+					if err != nil {
+						log.Println(err)
+						d.Nack(false, false)
+						continue
+					}
+					log.Printf("Received a message: %s", d.Body)
+
+					_, err = c.service.Reserve(
+						ctx,
+						event.LotID,
+						event.OrderID,
+						event.From,
+						event.To,
+					)
+
+					if err != nil {
+						log.Printf("reserve failed: %s", err)
+						d.Ack(false)
+						continue
+					}
+
+					log.Printf("spot reserved for order %s", event.OrderID)
+					d.Ack(false)
+
+				case rabbitmq.OrderPaidEvent:
+
+					var event events.OrderPaidEvent
+
+					err := json.Unmarshal(d.Body, &event)
+					if err != nil {
+						log.Println(err)
+					}
+					log.Printf("Received a message: %s", d.Body)
+
+					reservationID, err := c.service.GetReservation(ctx, event.OrderID)
+					if err != nil {
+						log.Println(err)
+					}
+
+					err = c.service.ChangeStatus(ctx, reservationID, "paid")
+					if err != nil {
+						if err := rabbitmq.HandleRetry(ch, &d); err != nil {
+							log.Printf("Retry error: %s", err)
+						}
+						d.Nack(false, false)
+						continue
+					}
+					log.Printf("Reservation status updated for order %s", event.OrderID)
 				}
-				log.Printf("Received a message: %s", d.Body)
 
-				_, err = c.service.Reserve(
-					ctx,
-					order.LotID,
-					order.OrderID,
-					order.From,
-					order.To,
-				)
-
-				if err != nil {
-					log.Printf("reserve failed: %s", err)
-					d.Nack(false, true)
-					continue
-				}
-
-				log.Printf("spot reserved for order %s", order.OrderID)
-
-				d.Ack(false)
+				//d.Ack(false)
 			}
 		}
 	}()

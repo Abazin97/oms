@@ -90,7 +90,7 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 						continue
 					}
 
-					log.Printf("Stock reservation failed for order: %s", event.OrderID)
+					log.Printf("Spot reservation failed for order: %s", event.OrderID)
 
 				case rabbitmq.PaymentCreatedEvent:
 

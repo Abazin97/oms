@@ -92,6 +92,8 @@ func main() {
 	stockService := services.NewStockService(txManager, parkingRepo, reservationRepo, ch)
 	handlers.NewGRPCHandler(grpcSrv, stockService)
 
+	stockService.StartReservationCleaner(ctx)
+
 	c := consumer.NewConsumer(stockService)
 	go c.Listen(ctx, ch)
 

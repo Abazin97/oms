@@ -11,21 +11,21 @@ import (
 	"stock/internal/events"
 	"stock/internal/repository"
 	"stock/internal/tx"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-var ErrNotEnoughSpots = errors.New("not enough spots")
+var ErrNoFreeSpots = errors.New("no free spots")
 
 type StockService interface {
 	StartReservationCleaner(ctx context.Context)
 	Reserve(ctx context.Context, lotID string, orderID string, from time.Time, to time.Time) (*models.Reservation, error)
-	ChangeStatus(ctx context.Context, reservationID uuid.UUID, status string) error
+	ChangeStatus(ctx context.Context, reservationID string, status string) error
 	GetAvailability(ctx context.Context, lotID uuid.UUID, from time.Time, to time.Time) (bool, error)
-	Release(ctx context.Context, reservationID uuid.UUID) error
+	Release(ctx context.Context, reservationID string) error
+	GetReservation(ctx context.Context, orderID string) (string, error)
 }
 
 type stockService struct {
@@ -70,11 +70,10 @@ func (s *stockService) StartReservationCleaner(ctx context.Context) {
 }
 
 func (s *stockService) GetAvailability(ctx context.Context, lotID uuid.UUID, from time.Time, to time.Time) (bool, error) {
-	const op = "stock.services.GetAvailability"
 
 	available, err := s.parkingSpotRepo.Get(ctx, lotID, from, to)
 	if err != nil {
-		return false, fmt.Errorf("%s: %w", op, err)
+		return false, err
 	}
 
 	return available, nil
@@ -88,9 +87,9 @@ func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string
 		return nil, fmt.Errorf("%s: invalid lotID: %w", op, err)
 	}
 
-	spotID, err := s.spotReservationRepo.Get(ctx, lotUUID, from, to)
+	spotID, err := s.spotReservationRepo.GetSpot(ctx, lotUUID, from, to)
 	if err != nil {
-		if strings.Contains(err.Error(), "no free spots") {
+		if errors.Is(err, ErrNoFreeSpots) {
 			event := events.StockReservationFailedEvent{
 				OrderID: orderID,
 				Reason:  err.Error(),
@@ -120,18 +119,14 @@ func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string
 		return nil, fmt.Errorf("%s: invalid spotID: %w", op, err)
 	}
 
-	orderUUID, err := uuid.Parse(orderID)
-	if err != nil {
-		return nil, fmt.Errorf("%s: invalid orderID: %w", op, err)
-	}
-
 	var reservation *models.Reservation
+	var reservationID string
 
 	err = s.tx.WithTx(ctx, func(tx tx.Tx) error {
 
 		reservation = &models.Reservation{
 			ParkingSpotID: spotUUID,
-			OrderID:       orderUUID,
+			OrderID:       orderID,
 			CreatedAt:     time.Now(),
 			ExpiresAt:     time.Now().Add(15 * time.Minute),
 			StartsAt:      from,
@@ -139,10 +134,11 @@ func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string
 			Status:        "pending",
 		}
 
-		err := s.spotReservationRepo.Create(ctx, tx, reservation)
+		resID, err := s.spotReservationRepo.Create(ctx, tx, reservation)
 		if err != nil {
-			return fmt.Errorf("%s: %w", op, err)
+			return err
 		}
+		reservationID = resID
 
 		return nil
 	})
@@ -152,7 +148,7 @@ func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string
 	}
 
 	event := events.StockReservedEvent{
-		ReservationID: spotID,
+		ReservationID: reservationID,
 		OrderID:       orderID,
 		Status:        reservation.Status,
 		StartsAt:      reservation.StartsAt,
@@ -177,12 +173,12 @@ func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string
 	return reservation, nil
 }
 
-func (s *stockService) ChangeStatus(ctx context.Context, reservationID uuid.UUID, status string) error {
+func (s *stockService) ChangeStatus(ctx context.Context, reservationID string, status string) error {
 	const op = "stock.services.ChangeStatus"
 
 	err := s.tx.WithTx(ctx, func(tx tx.Tx) error {
 		if err := s.spotReservationRepo.Update(ctx, tx, reservationID, status); err != nil {
-			return fmt.Errorf("%s: %w", op, err)
+			return err
 		}
 
 		return nil
@@ -192,7 +188,7 @@ func (s *stockService) ChangeStatus(ctx context.Context, reservationID uuid.UUID
 	}
 
 	event := events.StockStatusChangedEvent{
-		ReservationID: reservationID.String(),
+		ReservationID: reservationID,
 		Status:        status,
 	}
 
@@ -216,7 +212,7 @@ func (s *stockService) ChangeStatus(ctx context.Context, reservationID uuid.UUID
 
 func (s *stockService) Release(
 	ctx context.Context,
-	reservationID uuid.UUID,
+	reservationID string,
 ) error {
 
 	const op = "stock.services.Release"
@@ -230,7 +226,7 @@ func (s *stockService) Release(
 	}
 
 	event := events.StockReleasedEvent{
-		ReservationID: reservationID.String(),
+		ReservationID: reservationID,
 		Reason:        "released",
 	}
 
@@ -256,4 +252,13 @@ func (s *stockService) Release(
 	log.Printf("reservation released %s", reservationID)
 
 	return nil
+}
+
+func (s *stockService) GetReservation(ctx context.Context, orderID string) (string, error) {
+	orderUUID, err := uuid.Parse(orderID)
+	if err != nil {
+		return "", err
+	}
+
+	return s.spotReservationRepo.GetReservation(ctx, orderUUID)
 }

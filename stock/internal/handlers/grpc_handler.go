@@ -65,7 +65,7 @@ func (s *serverAPI) Reserve(ctx context.Context, req *pb.ReserveRequest) (*pb.Re
 	}
 
 	return &pb.ReserveResponse{
-		ReservationId: reservation.ID.String(),
+		ReservationId: reservation.ID,
 		ExpiresAt:     timestamppb.New(reservation.ExpiresAt),
 	}, nil
 }

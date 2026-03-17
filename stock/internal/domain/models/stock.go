@@ -22,8 +22,8 @@ type ParkingSpot struct {
 }
 
 type Reservation struct {
-	ID            uuid.UUID
-	OrderID       uuid.UUID
+	ID            string
+	OrderID       string
 	ExpiresAt     time.Time
 	CreatedAt     time.Time
 	ParkingSpotID uuid.UUID

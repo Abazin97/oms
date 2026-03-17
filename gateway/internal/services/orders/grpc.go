@@ -32,6 +32,8 @@ func (g *ordersGateway) CreateOrder(ctx context.Context, cr *pbo.CreateOrderRequ
 		CustomerId: cr.CustomerId,
 		Id:         cr.Id,
 		Items:      cr.Items,
+		To:         cr.To,
+		From:       cr.From,
 	})
 	if err != nil {
 		return nil, err
