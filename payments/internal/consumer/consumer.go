@@ -65,8 +65,7 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 					}
 					log.Println("event body:", string(d.Body))
 
-					// todo: remove hardcode strings
-					payment, err := c.service.CreatePayment(ctx, p.OrderID, "2", "RUB")
+					payment, err := c.service.CreatePayment(ctx, p.OrderID, p.Amount, p.Currency)
 					if err != nil {
 						log.Printf("Error creating payment link: %s", err)
 
@@ -76,8 +75,10 @@ func (c *Consumer) Listen(ctx context.Context, ch *amqp.Channel) {
 
 						d.Nack(false, true)
 					}
-
 					log.Printf("Payment link created for order %s: %s", p.OrderID, payment.Confirmation.ConfirmationURL)
+
+				case rabbitmq.StockReservationFailedEvent:
+					log.Println("stock reservation failed:", string(d.Body))
 					d.Ack(false)
 				}
 

@@ -147,12 +147,13 @@ func (s *stockService) Reserve(ctx context.Context, lotID string, orderID string
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
+	// todo: implement price calculation "calculatePrice()"
 	event := events.StockReservedEvent{
 		ReservationID: reservationID,
 		OrderID:       orderID,
 		Status:        reservation.Status,
-		StartsAt:      reservation.StartsAt,
-		EndsAt:        reservation.EndsAt,
+		Amount:        "2",
+		Currency:      "RUB",
 	}
 
 	body, err := json.Marshal(event)

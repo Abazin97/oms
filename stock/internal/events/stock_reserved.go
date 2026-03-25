@@ -1,12 +1,9 @@
 package events
 
-import "time"
-
 type StockReservedEvent struct {
-	ReservationID string    `json:"reservation_id"`
-	OrderID       string    `json:"order_id"`
-	Status        string    `json:"status"`
-	StartsAt      time.Time `json:"startsAt"`
-	EndsAt        time.Time `json:"endsAt"`
-	CreatedAt     time.Time `json:"createdAt"`
+	ReservationID string `json:"reservation_id"`
+	OrderID       string `json:"order_id"`
+	Status        string `json:"status"`
+	Amount        string `json:"amount"`
+	Currency      string `json:"currency"`
 }
